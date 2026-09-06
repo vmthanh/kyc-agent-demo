@@ -1,0 +1,16 @@
+[project]
+name = "kyc-exception-resolution-agent"
+version = "0.1.0"
+description = "KYC exception resolution agent demo"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain-openai>=0.2.12",
+    "langgraph>=0.2.60",
+    "mlflow>=2.19.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.1",
+    "streamlit>=1.41.0",
+]
+
+[tool.uv]
+package = false

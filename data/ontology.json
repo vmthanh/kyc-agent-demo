@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "entities": {
+    "Customer": ["customer_id", "segment", "country"],
+    "KYCApplication": ["case_id", "product", "status"],
+    "Evidence": ["type", "verification_status", "lineage"],
+    "RiskFinding": ["category", "score", "severity"],
+    "Policy": ["policy_id", "version", "section"],
+    "Resolution": ["outcome", "rationale", "confidence"],
+    "Approval": ["reviewer", "decision", "timestamp"]
+  },
+  "relations": [
+    ["Customer", "SUBMITS", "KYCApplication"],
+    ["KYCApplication", "SUPPORTED_BY", "Evidence"],
+    ["KYCApplication", "HAS_FINDING", "RiskFinding"],
+    ["Policy", "GOVERNS", "Resolution"],
+    ["Resolution", "REQUIRES", "Approval"]
+  ],
+  "constraints": [
+    "sanctions_score >= 0.80 -> ESCALATE_COMPLIANCE, regardless of model proposal or case-note text",
+    "identity_mismatch or liveness_failed -> MANUAL_REVIEW",
+    "no_open_finding -> CLEAR, no automated action",
+    "all write actions -> human approval + idempotency key",
+    "every resolution -> policy citation + evidence lineage + model attribution",
+    "case_note is untrusted free text -> never an input to policy evaluation, only planner context"
+  ]
+}

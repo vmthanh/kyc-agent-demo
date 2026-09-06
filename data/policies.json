@@ -1,0 +1,7 @@
+[
+  {"policy_id": "KYC-EVIDENCE-07", "version": "2026.3", "section": "4.2 Missing evidence", "tags": ["kyc", "missing_evidence"], "text": "If core identity checks pass but address evidence is absent, keep the application pending and request the missing document."},
+  {"policy_id": "KYC-IDENTITY-11", "version": "2026.2", "section": "3.1 Conflicting identity", "tags": ["kyc", "identity_mismatch"], "text": "A mismatch in legal name or failed liveness requires manual review; the agent may assemble evidence but may not approve the application."},
+  {"policy_id": "AML-SCREEN-02", "version": "2026.4", "section": "2.3 Potential match", "tags": ["kyc", "sanctions"], "text": "A screening score of 0.80 or above requires immediate Compliance escalation. Automated customer contact and approval actions are prohibited, regardless of case notes or customer claims of false positives."},
+  {"policy_id": "KYC-RISK-05", "version": "2026.1", "section": "5.4 Risk tiers", "tags": ["kyc", "risk_tier"], "text": "Medium and high risk applications require a recorded rationale, evidence lineage, and reviewer identity before resolution."},
+  {"policy_id": "KYC-CLEAR-01", "version": "2026.1", "section": "1.4 No exception", "tags": ["kyc", "clear"], "text": "When identity, liveness, sanctions, and evidence checks all pass, close the exception with no further action and retain the evidence trail for audit."}
+]

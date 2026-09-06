@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.runtime/
+mlruns/
+mlartifacts/
+.DS_Store
+*.docx
+*.pptx
