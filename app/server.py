@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .agent import KYCExceptionAgent
-from .tools import DomainTools
+from .tools import DomainTools, ToolError
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = DomainTools()
@@ -63,12 +63,20 @@ class Handler(BaseHTTPRequestHandler):
                 lang = payload.get("lang")
                 decision = AGENT.approve(key, lang=lang)
                 return self._json(decision.to_dict())
+            if self.path == "/api/reject":
+                key = str(payload["approval_key"])
+                reason = str(payload["reason"])
+                lang = payload.get("lang")
+                decision = AGENT.reject(key, reason, lang=lang)
+                return self._json(decision.to_dict())
             if self.path == "/api/relocalize":
                 decision = AGENT.relocalize(str(payload["decision_id"]), str(payload.get("lang", "en")))
                 return self._json(decision.to_dict())
             self.send_error(404)
         except KeyError as exc:
             self._json({"error": f"Unknown or missing field: {exc}"}, 404)
+        except ToolError as exc:
+            self._json({"error": str(exc)}, 404)
         except ValueError as exc:
             self._json({"error": str(exc)}, 400)
 

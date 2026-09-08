@@ -5,6 +5,9 @@ __pycache__/
 .runtime/
 mlruns/
 mlartifacts/
+mlflow.db
 .DS_Store
 *.docx
 *.pptx
+*.pdf
+slides/.export/

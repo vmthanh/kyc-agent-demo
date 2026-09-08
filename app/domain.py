@@ -88,10 +88,10 @@ class AgentDecision:
     guardrail_override: str | None = None
     approval: ApprovalRequest | None = None
     executed_action: dict[str, Any] | None = None
+    review_result: dict[str, Any] | None = None
     ontology_path: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["outcome"] = self.outcome.value
         return value
-

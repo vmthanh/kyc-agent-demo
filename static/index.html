@@ -9,13 +9,13 @@
     header{padding:30px 5vw 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:end;background:#173c2f;color:white}
     header h1{font-size:clamp(28px,4vw,52px);line-height:.95;margin:0;letter-spacing:-.04em;max-width:720px}header p{margin:0;color:#c8d6cf;max-width:380px;text-align:right}
     main{max-width:1400px;margin:auto;padding:28px 5vw 60px}.control{display:grid;grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:24px}
-    select,button{font:inherit;border:1px solid var(--line);border-radius:8px;padding:13px 16px;background:var(--card)}button{cursor:pointer;background:var(--lime);border-color:#8ab63a;font-weight:750}button:disabled{opacity:.5;cursor:not-allowed}
+    select,input,button{font:inherit;border:1px solid var(--line);border-radius:8px;padding:13px 16px;background:var(--card)}button{cursor:pointer;background:var(--lime);border-color:#8ab63a;font-weight:750}button:disabled{opacity:.5;cursor:not-allowed}
     .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:22px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 5px 18px #24372d0a}
     h2{margin:0 0 16px;font-size:20px}h3{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:22px 0 10px}.result{font-size:27px;font-weight:800;letter-spacing:-.03em}.summary{font-size:18px;line-height:1.5}
     .badges{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.badge{font-size:12px;padding:5px 9px;border-radius:99px;background:#edf2ed;border:1px solid var(--line)}.critical{color:var(--red);background:#fff0ed}.high{color:var(--red)}.medium{color:var(--amber)}.low{color:var(--green)}
     .timeline{list-style:none;padding:0;margin:0}.timeline li{position:relative;padding:0 0 18px 25px;border-left:2px solid #cae0d4;margin-left:6px}.timeline li:last-child{border-left-color:transparent}.timeline li:before{content:'';position:absolute;left:-6px;top:2px;width:10px;height:10px;background:var(--green);border-radius:50%}.timeline b{display:block}.timeline span,.muted{color:var(--muted);font-size:13px;line-height:1.5}
     .policy{border-left:3px solid var(--green);padding:2px 0 2px 12px;margin:13px 0}.policy b{font-size:13px}.policy p{font-size:14px;margin:4px 0;color:#45554d;line-height:1.45}.facts li{margin:8px 0}
-    .approval{margin-top:20px;padding:18px;border-radius:9px;background:#eff7e5;border:1px solid #c8df9f}.approval button{width:100%;margin-top:10px}.empty{text-align:center;padding:80px 30px;color:var(--muted)}
+    .approval{margin-top:20px;padding:18px;border-radius:9px;background:#eff7e5;border:1px solid #c8df9f}.approval button{width:100%;margin-top:10px}.approval .reject{background:#fff0ed;border-color:#f0b8ad;color:#7a2a20}.approval input{width:100%;margin-top:12px}.empty{text-align:center;padding:80px 30px;color:var(--muted)}
     .override{margin:14px 0;padding:14px 16px;border-radius:9px;background:#fff0ed;border:1px solid #f0b8ad;color:#7a2a20;font-size:14px;line-height:1.5}
     .rationale{margin:12px 0;padding:14px 16px;border-radius:9px;background:#f2f4ef;border:1px solid var(--line);font-size:14px;line-height:1.5}
     .rationale-meta{font-size:12px;color:var(--muted);margin-top:8px}
@@ -59,42 +59,57 @@ function applyChrome(){
 async function init(){const cases=await fetch('/api/cases').then(r=>r.json());$('#case').innerHTML=cases.map(c=>`<option value="${esc(c.case_id)}">${esc(c.case_id)} — ${esc(c.title)} · ${esc(c.signal)}</option>`).join('')}
 
 let lastDecision = null;
+let viewVersion = 0;
+function clearDecision(){
+ viewVersion++; lastDecision=null;
+ $('#content').className='empty'; $('#content').textContent=(CHROME[$('#lang').value]||CHROME.en).empty;
+}
 function render(d){
  lastDecision = d;
  const documents = d.approval?.documents_label;
- const docLine = documents ? `<div class="muted">${d.lang==='vi'?'Hồ sơ được yêu cầu bổ sung':'Requested documents'}: ${esc(documents)}</div>` : '';
- const approval=d.approval&&!d.executed_action?`<div class="approval"><b>${d.lang==='vi'?'Cần con người phê duyệt':'Human approval required'}</b><div class="muted">${esc(d.approval.action)} · key ${esc(d.approval.approval_key)}</div>${docLine}<button onclick="approve('${esc(d.approval.approval_key)}')">${d.lang==='vi'?'Phê duyệt hành động có giới hạn':'Approve bounded action'}</button></div>`:'';
+  const docLine = documents ? `<div class="muted">${d.lang==='vi'?'Hồ sơ được yêu cầu bổ sung':'Requested documents'}: ${esc(documents)}</div>` : '';
+  const caseLabel = d.lang==='vi' ? 'Hồ sơ' : 'Case';
+ const approval=d.approval&&!d.executed_action?`<div class="approval"><b>${d.lang==='vi'?'Cần con người phê duyệt':'Human approval required'}</b><div class="muted">${caseLabel} ${esc(d.case_id)} · ${esc(d.approval.action)} · key ${esc(d.approval.approval_key)}</div>${docLine}<button onclick="approve('${esc(d.approval.approval_key)}')">${d.lang==='vi'?'Phê duyệt hành động có giới hạn':'Approve bounded action'}</button><input id="reject-reason" maxlength="500" placeholder="${d.lang==='vi'?'Lý do từ chối (bắt buộc)':'Rejection reason (required)'}"><button class="reject" onclick="reject('${esc(d.approval.approval_key)}')">${d.lang==='vi'?'Từ chối hành động':'Reject action'}</button></div>`:'';
  const executed=d.executed_action?`<div class="approval"><b>${d.lang==='vi'?'Đã thực thi hành động':'Action executed'}</b><div>${esc(d.executed_action.action)} · ${esc(d.executed_action.ticket_id)}${d.executed_action.replayed?(d.lang==='vi'?' · phát lại idempotent':' · idempotent replay'):''}</div></div>`:'';
+ const rejected=d.review_result?.status==='rejected'?`<div class="approval"><b>${d.lang==='vi'?'Đã từ chối hành động':'Action rejected'}</b><div class="muted">${esc(d.review_result.reason)}</div></div>`:'';
  const override=d.guardrail_override?`<div class="override"><b>${d.lang==='vi'?'Lớp bảo vệ đã ghi đè':'Guardrail override'}</b><br>${esc(d.guardrail_override)}</div>`:'';
  const confLabel = d.lang==='vi' ? 'độ tin cậy của bộ lập luận' : 'planner confidence';
  const overriddenNote = d.guardrail_override ? (d.lang==='vi' ? ' (đã bị ghi đè)' : ' (overridden)') : '';
  const translationNote = !d.rationale_translated ? `<div class="rationale-meta">${d.lang==='vi'?'Không thể dịch trực tiếp (thiếu OPENROUTER_API_KEY) -- hiển thị nguyên văn tiếng Anh của mô hình.':"Live translation unavailable (no OPENROUTER_API_KEY) -- showing the model's original English answer."}</div>` : '';
  $('#content').className='grid'; $('#content').innerHTML=`
- <section class="card"><div class="result">${esc(d.outcome_label)}</div><div class="badges"><span class="badge ${d.risk_level.toLowerCase()}">${esc(d.risk_label)}</span><span class="badge">${esc(d.model)}</span><span class="badge">${d.tool_calls.length} tool calls</span></div><p class="summary">${esc(d.summary)}</p>${override}
+ <section class="card"><div class="result">${esc(d.outcome_label)}</div><div class="badges"><span class="badge">${caseLabel} ${esc(d.case_id)}</span><span class="badge ${d.risk_level.toLowerCase()}">${esc(d.risk_label)}</span><span class="badge">${esc(d.model)}</span><span class="badge">${d.tool_calls.length} tool calls</span></div><p class="summary">${esc(d.summary)}</p>${override}
  <h3>${d.lang==='vi'?'Lý giải của bộ lập luận (chỉ tham khảo)':'Planner rationale (advisory)'}</h3><div class="rationale">${esc(d.llm_rationale)}<div class="rationale-meta">${confLabel}: ${Math.round(d.proposal_confidence*100)}%${overriddenNote}</div>${translationNote}</div>
  <h3>${d.lang==='vi'?'Đường dẫn ontology':'Ontology path'}</h3><div class="ontology">${d.ontology_path.map((n,i)=>`${i?'<span class="arrow">→</span>':''}<span class="node">${esc(n)}</span>`).join('')}</div>
  <h3>${d.lang==='vi'?'Dữ kiện đã xác minh':'Grounded facts'}</h3><ul class="facts">${d.facts.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
- <h3>${d.lang==='vi'?'Bằng chứng chính sách':'Policy evidence'}</h3>${d.citations.map(c=>`<div class="policy"><b>${esc(c.policy_id)} · v${esc(c.version)} · ${esc(c.section)}</b><p>${esc(c.excerpt)}</p></div>`).join('')}${approval}${executed}</section>
+ <h3>${d.lang==='vi'?'Bằng chứng chính sách':'Policy evidence'}</h3>${d.citations.map(c=>`<div class="policy"><b>${esc(c.policy_id)} · v${esc(c.version)} · ${esc(c.section)}</b><p>${esc(c.excerpt)}</p></div>`).join('')}${approval}${executed}${rejected}</section>
  <aside><section class="card"><h2>${d.lang==='vi'?'Nhật ký suy luận':'Agent trace'}</h2><ol class="timeline">${d.trace.map(e=>`<li><b>${e.status==='override'?'🚨 ':e.status==='degraded'?'⚠️ ':''}${esc(e.title)}</b><span>${esc(e.detail)}</span></li>`).join('')}</ol><h3>${d.lang==='vi'?'Chi tiết công cụ':'Tool inspection'}</h3>${d.tool_calls.map(t=>`<details><summary>${esc(t.name)} · ${t.duration_ms} ms</summary><div class="toolout">${esc(JSON.stringify(t.output,null,2))}</div></details>`).join('')}</section></aside>`;
 }
 
 async function run(){
- $('#run').disabled=true; const restore=$('#run').textContent; $('#run').textContent=(CHROME[$('#lang').value]||CHROME.en).reasoning;
+ const version=++viewVersion; const caseId=$('#case').value; const lang=$('#lang').value;
+ $('#run').disabled=true; $('#run').textContent=(CHROME[lang]||CHROME.en).reasoning;
  try{
-  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:$('#case').value,planner:$('#planner').value,lang:$('#lang').value})});
-  render(await r.json());
- } finally { $('#run').disabled=false; $('#run').textContent=restore; }
+  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:caseId,planner:$('#planner').value,lang})});
+  const decision=await r.json();
+  if (version !== viewVersion) return;
+  if (caseId !== $('#case').value || lang !== $('#lang').value) return;
+  render(decision);
+ } finally { $('#run').disabled=false; applyChrome(); }
 }
-async function approve(key){const r=await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_key:key,lang:$('#lang').value})});render(await r.json())}
+async function approve(key){const version=++viewVersion; const caseId=lastDecision?.case_id; const lang=$('#lang').value; const r=await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_key:key,lang})});const decision=await r.json();if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(decision)}
+async function reject(key){const reason=$('#reject-reason').value.trim();if(!reason){$('#reject-reason').focus();return;}const version=++viewVersion;const caseId=lastDecision?.case_id;const lang=$('#lang').value;const r=await fetch('/api/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_key:key,reason,lang})});const decision=await r.json();if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(decision)}
 
 async function onLangChange(){
- if (lastDecision){
-  const r=await fetch('/api/relocalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision_id:lastDecision.decision_id,lang:$('#lang').value})});
-  render(await r.json());
+ const version=++viewVersion; const decision=lastDecision; const lang=$('#lang').value;
+ if (decision){
+  const r=await fetch('/api/relocalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision_id:decision.decision_id,lang})});
+  const localized=await r.json();
+  if(version===viewVersion&&decision.case_id===$('#case').value&&lang===$('#lang').value)render(localized);
  }
  applyChrome();
 }
 $('#run').addEventListener('click',run);
+$('#case').addEventListener('change', clearDecision);
 $('#lang').addEventListener('change',onLangChange);
 applyChrome(); init();
 </script>

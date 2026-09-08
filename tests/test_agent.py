@@ -1,4 +1,7 @@
+import io
+import json
 import threading
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -7,6 +10,7 @@ from app.agent import KYCExceptionAgent
 from app.domain import LLMProposal, Outcome
 from app.planner import OpenRouterPlanner
 from app.policy import evaluate, guard
+from app.server import Handler
 from app.tools import DomainTools
 
 
@@ -141,6 +145,55 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(len(ticket_ids), len(set(ticket_ids)))
 
 
+class HTTPServerTests(unittest.TestCase):
+    def test_unknown_case_returns_a_json_not_found_response(self) -> None:
+        """Client input errors must not terminate the HTTP connection."""
+        body = json.dumps({"case_id": "KYC-UNKNOWN", "planner": "heuristic"}).encode()
+        handler = object.__new__(Handler)
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.path = "/api/run"
+        responses = []
+        handler._json = lambda value, status=200: responses.append((value, status))
+
+        handler.do_POST()
+
+        self.assertEqual(responses, [({"error": "Unknown case: KYC-UNKNOWN"}, 404)])
+
+    def test_reject_endpoint_passes_the_review_reason_to_the_agent(self) -> None:
+        body = json.dumps({"approval_key": "approval-1", "reason": "Evidence is too old", "lang": "en"}).encode()
+        handler = object.__new__(Handler)
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.path = "/api/reject"
+        responses = []
+        handler._json = lambda value, status=200: responses.append((value, status))
+
+        class FakeDecision:
+            def to_dict(self):
+                return {"review_result": {"status": "rejected", "reason": "Evidence is too old"}}
+
+        with patch("app.server.AGENT.reject", return_value=FakeDecision()) as reject:
+            handler.do_POST()
+
+        reject.assert_called_once_with("approval-1", "Evidence is too old", lang="en")
+        self.assertEqual(responses[0][0]["review_result"]["reason"], "Evidence is too old")
+
+
+class StaticDemoTests(unittest.TestCase):
+    def test_approval_is_bound_to_the_rendered_case_and_stale_responses_are_ignored(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn("${caseLabel} ${esc(d.case_id)}", source)
+        self.assertIn("$('#case').addEventListener('change', clearDecision);", source)
+        self.assertIn("if (version !== viewVersion) return;", source)
+
+    def test_rejection_requires_a_reason_and_renders_a_distinct_outcome(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn("id=\"reject-reason\"", source)
+        self.assertIn("/api/reject", source)
+        self.assertIn("Action rejected", source)
+
+
 class AgentEndToEndTests(unittest.TestCase):
     """Runs the full LangGraph pipeline with the offline heuristic planner --
     deterministic, no network, matches what a live demo runs by default."""
@@ -188,6 +241,21 @@ class AgentEndToEndTests(unittest.TestCase):
         first = self.agent.approve(key).executed_action
         second = self.agent.approve(key).executed_action
         self.assertEqual(first["ticket_id"], second["ticket_id"])
+
+    def test_rejecting_an_action_records_the_reason_without_a_side_effect(self) -> None:
+        result = self.run_heuristic("KYC-1042")
+
+        rejected = self.agent.reject(result.approval.approval_key, "Document is too old")
+
+        self.assertIsNone(rejected.executed_action)
+        self.assertEqual(rejected.review_result, {"status": "rejected", "reason": "Document is too old"})
+        self.assertIsNone(rejected.approval)
+        self.assertTrue(any("Document is too old" in event.detail for event in rejected.trace))
+
+    def test_rejection_requires_a_reason(self) -> None:
+        result = self.run_heuristic("KYC-1042")
+        with self.assertRaisesRegex(ValueError, "reason"):
+            self.agent.reject(result.approval.approval_key, "   ")
 
     def test_two_runs_of_the_same_case_get_independent_approval_handles(self) -> None:
         """Running the same case+action twice before approving either one

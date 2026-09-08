@@ -186,8 +186,9 @@ def build_graph(tools: DomainTools, planner: Planner):
             }
         )
         if not approval_payload.get("approved"):
-            trace = state["trace"] + [_event("approval", "Reviewer rejected", "No action executed")]
-            return {"action_result": {"status": "rejected"}, "trace": trace}
+            reason = str(approval_payload.get("reason", "")).strip()
+            trace = state["trace"] + [_event("approval", "Reviewer rejected", f"Reason: {reason}")]
+            return {"action_result": {"status": "rejected", "reason": reason}, "trace": trace}
 
         write_key = hashlib.sha256(f"{state['case_id']}:{decision['action']}".encode()).hexdigest()[:16]
         result = tools.execute_approved_action(decision["action_payload"], write_key)
@@ -262,11 +263,24 @@ class KYCExceptionAgent:
             return self._to_decision(case_id, result, config, graph, lang, decision_id)
 
     def approve(self, approval_key: str, lang: str | None = None) -> AgentDecision:
+        return self._resolve_approval(approval_key, approved=True, lang=lang)
+
+    def reject(self, approval_key: str, reason: str, lang: str | None = None) -> AgentDecision:
+        reason = reason.strip()
+        if not reason:
+            raise ValueError("A rejection reason is required")
+        return self._resolve_approval(approval_key, approved=False, reason=reason, lang=lang)
+
+    def _resolve_approval(
+        self, approval_key: str, approved: bool, reason: str | None = None, lang: str | None = None,
+    ) -> AgentDecision:
         with self._lock:
             if approval_key not in self._pending:
                 raise KeyError("Unknown or expired approval")
             pending = self._pending[approval_key]
-            result = pending["graph"].invoke(Command(resume={"approved": True}), pending["config"])
+            result = pending["graph"].invoke(
+                Command(resume={"approved": approved, "reason": reason}), pending["config"]
+            )
             decision_id = pending["decision_id"]
             self._results[decision_id] = {
                 "case_id": pending["case_id"], "result": result, "config": pending["config"], "graph": pending["graph"],
@@ -307,6 +321,7 @@ class KYCExceptionAgent:
         proposal = LLMProposal(**result["proposal"])
         override = i18n.render_override(decision["override_info"], lang) if decision["override_info"] else None
         rationale, rationale_translated = self._render_rationale(proposal, lang)
+        action_result = result.get("action_result") or {}
 
         return AgentDecision(
             case_id=case_id,
@@ -330,7 +345,8 @@ class KYCExceptionAgent:
             rationale_translated=rationale_translated,
             guardrail_override=override,
             approval=approval,
-            executed_action=result.get("action_result"),
+            executed_action=action_result if action_result.get("status") == "executed" else None,
+            review_result=action_result if action_result.get("status") == "rejected" else None,
             ontology_path=ONTOLOGY_PATH,
         )
 

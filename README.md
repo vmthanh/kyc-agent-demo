@@ -69,6 +69,9 @@ tests/
   test_agent.py  policy unit tests, tool idempotency, end-to-end graph tests, i18n tests, mocked-LLM adapter test
 docs/
   INTERVIEW_GUIDE.md, ARCHITECTURE.md, PRODUCTION_ROADMAP.md, ROUNDS_2_AND_3.md
+slides/
+  index.html     the interview deck: 20 HTML slides, speaker notes, print/export modes
+  to_pptx.py     renders index.html to slides/deck.pptx (Chrome + python-pptx)
 ```
 
 ## Run the primary demo (recommended for the interview)
@@ -90,6 +93,32 @@ the guardrail override live, in either language.
 uv run python -m app.cli --case KYC-1042 --approve
 uv run python -m app.cli --case KYC-1044 --planner adversarial --lang vi
 ```
+
+## Present the deck
+
+`slides/index.html` is the source of truth for the presentation -- open it in
+any browser and present from it directly. Narrative order: problem -> why the
+usual approaches fail -> architecture -> tech stack -> highlights -> benefits
+and conclusion. Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
+(all slides stacked, print-ready), `F` fullscreen.
+
+Export, when a file is needed instead of a browser:
+
+```bash
+# PDF handout, 960x540pt (16:9) pages -- the recommended export
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+  --no-pdf-header-footer --virtual-time-budget=3000 \
+  --print-to-pdf=slides/deck.pdf slides/index.html
+```
+
+```bash
+python3 slides/to_pptx.py     # -> slides/deck.pptx, 13.333x7.5in, speaker notes included
+```
+
+`to_pptx.py` embeds each slide as a 2560x1440 image, so the result is
+pixel-identical to the browser but *not* text-editable in PowerPoint -- edit
+`slides/index.html` and re-export. It writes `slides/deck.pptx` and leaves
+`Thanh_Vo_KYC_Agent_Demo.pptx` (the older, natively-editable deck) alone.
 
 ## Run the rich demo (LangGraph interrupt UI + MLflow tracing)
 

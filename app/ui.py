@@ -110,12 +110,21 @@ if decision is not None:
             if st.button(i18n.ui_text(lang, "approve_button")):
                 st.session_state.decision = agent.approve(decision.approval.approval_key, lang=lang)
                 st.rerun()
+            rejection_reason = st.text_input(i18n.ui_text(lang, "reject_reason"), key=f"reject-{decision.decision_id}")
+            if st.button(i18n.ui_text(lang, "reject_button")):
+                try:
+                    st.session_state.decision = agent.reject(decision.approval.approval_key, rejection_reason, lang=lang)
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
         if decision.executed_action:
             st.success(
                 f"{i18n.ui_text(lang, 'action_executed')}: {decision.executed_action['action']} -> "
                 f"{decision.executed_action['ticket_id']}"
                 + (f" ({i18n.ui_text(lang, 'idempotent_replay')})" if decision.executed_action.get("replayed") else "")
             )
+        if decision.review_result and decision.review_result["status"] == "rejected":
+            st.warning(f"{i18n.ui_text(lang, 'action_rejected')}: {decision.review_result['reason']}")
 
     with right:
         st.subheader(i18n.ui_text(lang, "agent_trace"))
