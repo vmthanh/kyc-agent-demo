@@ -12,6 +12,37 @@ class Outcome(str, Enum):
     ESCALATE_COMPLIANCE = "ESCALATE_COMPLIANCE"
 
 
+class WorkflowStatus(str, Enum):
+    RUNNING = "RUNNING"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    AWAITING_DOCUMENTS = "AWAITING_DOCUMENTS"
+    AWAITING_OPERATIONS = "AWAITING_OPERATIONS"
+    COMPLETED = "COMPLETED"
+    BLOCKED = "BLOCKED"
+    REJECTED = "REJECTED"
+
+
+class PendingTaskKind(str, Enum):
+    ACTION_APPROVAL = "action_approval"
+    DOCUMENT_SUBMISSION = "document_submission"
+    OPERATIONAL_REVIEW = "operational_review"
+
+
+@dataclass(frozen=True)
+class PendingTask:
+    kind: PendingTaskKind
+    interrupt_key: str
+    title: str
+    message: str
+    payload: dict[str, Any]
+    allowed_responses: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        value = asdict(self)
+        value["kind"] = self.kind.value
+        return value
+
+
 @dataclass(frozen=True)
 class PolicyCitation:
     policy_id: str
@@ -36,6 +67,11 @@ class TraceEvent:
     title: str
     detail: str
     status: str = "complete"
+    cycle: int = 1
+    duration_ms: int = 0
+    attempt: int = 1
+    route: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -56,6 +92,7 @@ class LLMProposal:
     model: str
     rationale_key: str | None = None
     rationale_params: dict[str, Any] | None = None
+    usage: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -74,15 +111,15 @@ class AgentDecision:
     outcome: Outcome
     outcome_label: str
     summary: str
-    proposal_confidence: float
+    proposal_confidence: float | None
     risk_level: str
     risk_label: str
     facts: list[str]
     citations: list[PolicyCitation]
     tool_calls: list[ToolCall]
     trace: list[TraceEvent]
-    model: str
-    llm_rationale: str
+    model: str | None
+    llm_rationale: str | None
     lang: str = "en"
     rationale_translated: bool = True
     guardrail_override: str | None = None
@@ -90,8 +127,17 @@ class AgentDecision:
     executed_action: dict[str, Any] | None = None
     review_result: dict[str, Any] | None = None
     ontology_path: list[str] = field(default_factory=list)
+    workflow_status: WorkflowStatus = WorkflowStatus.COMPLETED
+    current_node: str = "finalize"
+    cycle_count: int = 1
+    max_cycles: int = 2
+    pending_task: PendingTask | None = None
+    planner_attempts: int = 0
+    planner_usage: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["outcome"] = self.outcome.value
+        value["workflow_status"] = getattr(self.workflow_status, "value", self.workflow_status)
+        value["pending_task"] = self.pending_task.to_dict() if self.pending_task else None
         return value

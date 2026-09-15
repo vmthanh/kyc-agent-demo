@@ -55,6 +55,14 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "translation_unavailable": "Live translation unavailable (no OPENROUTER_API_KEY) -- showing the model's original English answer.",
         "approve_prompt": "Approve this bounded action?",
         "requested_documents": "Requested documents",
+        "workflow_status": "Workflow status",
+        "current_node": "Current step",
+        "cycle": "Evaluation cycle",
+        "pending_document_submission": "Document submission required",
+        "operational_handoff": "Operational review required",
+        "planner_attempts": "Planner attempts",
+        "tokens": "tokens",
+        "cost": "cost",
     },
     "vi": {
         "title": "Tác Tử Xử Lý Ngoại Lệ KYC",
@@ -85,6 +93,14 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "translation_unavailable": "Không thể dịch trực tiếp (thiếu OPENROUTER_API_KEY) -- hiển thị nguyên văn tiếng Anh của mô hình.",
         "approve_prompt": "Phê duyệt hành động có giới hạn này?",
         "requested_documents": "Hồ sơ được yêu cầu bổ sung",
+        "workflow_status": "Trạng thái quy trình",
+        "current_node": "Bước hiện tại",
+        "cycle": "Vòng đánh giá",
+        "pending_document_submission": "Cần bổ sung tài liệu",
+        "operational_handoff": "Cần chuyển rà soát vận hành",
+        "planner_attempts": "Số lần thử bộ lập luận",
+        "tokens": "token",
+        "cost": "chi phí",
     },
 }
 
@@ -110,8 +126,8 @@ OUTCOME_LABELS = {
 }
 
 RISK_LABELS = {
-    "en": {"LOW": "LOW", "MEDIUM": "MEDIUM", "HIGH": "HIGH", "CRITICAL": "CRITICAL"},
-    "vi": {"LOW": "THẤP", "MEDIUM": "TRUNG BÌNH", "HIGH": "CAO", "CRITICAL": "NGHIÊM TRỌNG"},
+    "en": {"LOW": "LOW", "MEDIUM": "MEDIUM", "HIGH": "HIGH", "CRITICAL": "CRITICAL", "UNKNOWN": "UNKNOWN"},
+    "vi": {"LOW": "THẤP", "MEDIUM": "TRUNG BÌNH", "HIGH": "CAO", "CRITICAL": "NGHIÊM TRỌNG", "UNKNOWN": "CHƯA XÁC ĐỊNH"},
 }
 
 NO_ACTION_LABEL = {"en": "no-action", "vi": "không hành động"}
@@ -166,6 +182,22 @@ REASON_TEMPLATES: dict[str, dict[str, str]] = {
         "vi": "Đã đạt toàn bộ kiểm tra định danh, sinh trắc học, danh sách trừng phạt và hồ sơ "
         "(KYC-CLEAR-01); không cần xử lý ngoại lệ.",
     },
+    "ai_unavailable": {
+        "en": "Live model reasoning is unavailable; the case requires manual handling and no automated action was taken.",
+        "vi": "Không thể sử dụng suy luận từ mô hình trực tiếp; hồ sơ cần được xử lý thủ công và không có hành động tự động nào được thực hiện.",
+    },
+    "tool_unavailable": {
+        "en": "Authoritative case data is incomplete after retries; the case requires operational review.",
+        "vi": "Dữ liệu hồ sơ có thẩm quyền vẫn chưa đầy đủ sau khi thử lại; hồ sơ cần được rà soát vận hành.",
+    },
+    "policy_unavailable": {
+        "en": "Applicable policy evidence is missing or contradictory; automated resolution is blocked.",
+        "vi": "Bằng chứng chính sách áp dụng bị thiếu hoặc mâu thuẫn; hệ thống chặn xử lý tự động.",
+    },
+    "cycle_exhausted": {
+        "en": "Required evidence is still incomplete after the maximum evaluation cycles; manual review is required.",
+        "vi": "Hồ sơ vẫn chưa đầy đủ sau số vòng đánh giá tối đa; cần rà soát thủ công.",
+    },
 }
 
 
@@ -206,7 +238,9 @@ def render_override(info: dict, lang: str) -> str:
 # ---------------------------------------------------------------------------
 def render_facts(facts: dict, lang: str) -> list[str]:
     lang = _lang(lang)
-    docs, sanctions, risk = facts["verify_documents"], facts["screen_sanctions"], facts["get_risk_profile"]
+    docs = facts.get("verify_documents")
+    sanctions = facts.get("screen_sanctions")
+    risk = facts.get("get_risk_profile")
     templates = {
         "risk_tier": {"en": "Risk tier: {level} (score {score})", "vi": "Mức rủi ro: {level} (điểm {score})"},
         "liveness_passed": {"en": "Liveness: passed", "vi": "Sinh trắc học: đạt"},
@@ -225,14 +259,16 @@ def render_facts(facts: dict, lang: str) -> list[str]:
     def t(key: str, **params) -> str:
         return templates[key].get(lang, templates[key]["en"]).format(**params)
 
-    lines = [
-        t("risk_tier", level=risk_label(lang, risk["level"]), score=risk["score"]),
-        t("liveness_passed" if docs["liveness_passed"] else "liveness_failed"),
-        t("sanctions_score", score=sanctions["match_score"]),
-    ]
-    if sanctions["candidate"]:
+    lines: list[str] = []
+    if risk is not None:
+        lines.append(t("risk_tier", level=risk_label(lang, risk.get("level", "UNKNOWN")), score=risk.get("score")))
+    if docs is not None:
+        lines.append(t("liveness_passed" if docs.get("liveness_passed") else "liveness_failed"))
+    if sanctions is not None and sanctions.get("match_score") is not None:
+        lines.append(t("sanctions_score", score=sanctions["match_score"]))
+    if sanctions is not None and sanctions.get("candidate"):
         lines.append(t("sanctions_candidate", candidate=sanctions["candidate"]))
-    if docs["missing_fields"]:
+    if docs is not None and docs.get("missing_fields"):
         fields = ", ".join(field_label(lang, f) for f in docs["missing_fields"])
         lines.append(t("missing_fields", fields=fields))
     return lines
