@@ -1762,7 +1762,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "langchain-openai", specifier = ">=0.2.12" },
-    { name = "langgraph", specifier = ">=0.2.60" },
+    { name = "langgraph", specifier = ">=1.2.11,<2.0.0" },
     { name = "mlflow", specifier = ">=2.19.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
