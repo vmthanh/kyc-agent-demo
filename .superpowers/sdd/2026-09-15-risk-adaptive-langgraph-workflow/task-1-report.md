@@ -8,7 +8,7 @@ tests. No files outside Task 1 scope were changed.
 
 ## Commit
 
-`5a31ee4` (`feat: add branch-safe workflow state and routes`).
+`9f21e3c89c266b54c2f1bb2adb31df7b12390f04` (`feat: add branch-safe workflow state and routes`).
 
 ## Test-first evidence
 
