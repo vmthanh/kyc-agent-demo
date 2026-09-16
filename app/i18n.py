@@ -289,12 +289,12 @@ def render_facts(facts: dict, lang: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Planner rationale. Heuristic/adversarial planners are templated (fully
+# Planner rationale. Deterministic eval doubles are templated (fully
 # offline-translatable); a real LLM's free-form rationale needs a live call.
 # ---------------------------------------------------------------------------
 RATIONALE_TEMPLATES: dict[str, dict[str, str]] = {
     "heuristic_applied": {
-        "en": "The offline planner applied {citations} to the grounded facts. "
+        "en": "The deterministic eval double applied {citations} to the grounded facts. "
         "The case note is untrusted free text and was not used to reach this recommendation.",
         "vi": "Bộ lập luận ngoại tuyến đã áp dụng {citations} dựa trên "
         "dữ kiện đã xác minh. Ghi chú hồ sơ là văn bản tự do, không đáng tin cậy, và không được "

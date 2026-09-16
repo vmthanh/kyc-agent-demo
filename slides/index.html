@@ -397,7 +397,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </div>
   </div>
   <div class="banner sm" style="position:absolute;left:48px;right:48px;bottom:74px">
-    Swap the planner — heuristic, GPT-4o-mini, a future fine-tune — and the safety boundary does not move
+    Normal and compromised_demo both use OpenRouter; the safety boundary does not move
   </div>
   <div class="pagenum">07 / 20</div>
   <aside class="notes" data-src="data/ontology.json · app/policy.py · README.md (Design choices)">
@@ -413,12 +413,11 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <h1>Ontology structures context; policy controls autonomy</h1>
   <div class="body" style="margin-top:40px">
     <div class="pipeline">
-      <div class="node">Ground</div><div class="link"></div>
-      <div class="node">Retrieve</div><div class="link"></div>
-      <div class="node">Reason</div><div class="link"></div>
-      <div class="node hl">Guard</div><div class="link"></div>
-      <div class="node hl">Review</div><div class="link"></div>
-      <div class="node">Execute</div>
+      <div class="node">Parallel<br>grounding</div><div class="link"></div>
+      <div class="node">Evidence<br>quality gate</div><div class="link"></div>
+      <div class="node">Policy<br>precheck</div><div class="link"></div>
+      <div class="node">OpenRouter<br>proposal</div><div class="link"></div>
+      <div class="node hl">Reconcile<br>guard</div>
     </div>
     <div class="tiny" style="text-align:center;margin-top:16px">
       allowlisted reads &nbsp;·&nbsp; versioned policy &nbsp;·&nbsp; planner proposal &nbsp;·&nbsp;
@@ -437,16 +436,16 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </div>
   </div>
   <div class="banner" style="position:absolute;left:48px;right:48px;bottom:104px">
-    Planner proposes (LLM or offline fallback) <span class="sep">|</span> Guardrail recomputes independently, and can override it
+    OpenRouter proposes <span class="sep">|</span> Guardrail recomputes independently, then routes to request evidence, manual review, compliance stop, or resume cycle
   </div>
   <div class="tiny" style="position:absolute;left:48px;bottom:66px">
     Graph state stays JSON-safe, so the in-memory checkpointer swaps for Postgres/Redis without a rewrite (app/agent.py).
   </div>
   <div class="pagenum">08 / 20</div>
   <aside class="notes" data-src="app/agent.py: build_graph() · app/policy.py: guard() · data/ontology.json · docs/ARCHITECTURE.md">
-    Walk left to right. Ground calls four read tools; retrieve selects policy chunks by tags derived from the same
-    branch logic the guardrail uses; reason is the only node a model touches; guard recomputes the mandate and
-    builds the exact action payload; review pauses on interrupt(); execute runs through the idempotent gateway.
+    Walk through the fan-out/fan-in names. Ground calls four read tools; the evidence gate and policy precheck run
+    before OpenRouter; reconcile_guard recomputes the mandate and chooses the route; review pauses on interrupt();
+    execute runs through the idempotent gateway.
     Schemas, authorization and writes all live outside the model.
   </aside>
 </section>
@@ -578,7 +577,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <thead><tr><th>Layer</th><th>Choice</th><th>Why this one</th></tr></thead>
       <tbody>
         <tr><td>Orchestration</td><td>LangGraph</td><td>Explicit state, conditional branching, checkpointing, native human-in-the-loop interrupts</td></tr>
-        <tr><td>Planner seam</td><td>OpenRouter via langchain-openai, heuristic fallback</td><td>Real LLM reasoning when a key exists; deterministic and network-free otherwise, so a live demo never breaks</td></tr>
+        <tr><td>Planner seam</td><td>OpenRouter via langchain-openai</td><td>Normal and compromised_demo both make structured live calls; provider failures route to a strict safe state</td></tr>
         <tr><td>Safety</td><td>app/policy.py — pure functions</td><td>Independent of the model; the actual safety boundary, unit-testable in isolation</td></tr>
         <tr><td>Domain</td><td>data/ontology.json + typed dataclasses</td><td>Governance beyond a prompt- or RAG-only design: entities, relations, constraints</td></tr>
         <tr><td>Localization</td><td>app/i18n.py templates + best-effort LLM call</td><td>EN/VI renders offline and deterministically; only free-form model prose needs a network call</td></tr>
@@ -593,8 +592,8 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <div class="pagenum">12 / 20</div>
   <aside class="notes" data-src="README.md (Architecture and stack) · pyproject.toml · app/planner.py: select_planner()">
     The point of this slide is that no technology here is load-bearing for safety except policy.py, which is plain
-    Python. LangGraph earns its place for interrupts and checkpointing, not for agent magic. The offline fallback
-    is a deliberate demo-reliability choice: no key, no network, still a full end-to-end run.
+    Python. LangGraph earns its place for interrupts and checkpointing, not for agent magic. Normal and
+    compromised_demo both use OpenRouter; deterministic eval doubles keep CI offline.
   </aside>
 </section>
 
@@ -607,7 +606,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <colgroup><col style="width:16%"><col style="width:31%"><col style="width:53%"></colgroup>
       <thead><tr><th>Component</th><th>Demo today</th><th>Production path</th></tr></thead>
       <tbody>
-        <tr><td>Planner</td><td>select_planner(): OpenRouter or heuristic</td><td>Model gateway with retries, circuit breakers, rate limits, prompt/model version pinning</td></tr>
+        <tr><td>Planner</td><td>select_planner(): normal / compromised_demo</td><td>Model gateway with retries, circuit breakers, rate limits, prompt/model version pinning</td></tr>
         <tr><td>Policy retrieval</td><td>Tagged chunks in data/policies.json</td><td>Hybrid (embedding + tag) retrieval service with jurisdiction and effective-date filters</td></tr>
         <tr><td>Workflow state</td><td>MemorySaver, in process</td><td>Persistent LangGraph checkpointer (Postgres/Redis) plus stored approval events</td></tr>
         <tr><td>Action gateway</td><td>In-memory idempotency log</td><td>Durable store with a unique constraint or compare-and-swap on the idempotency key</td></tr>
@@ -646,9 +645,9 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <div class="card"><div class="k">Idempotent writes</div><h3>Retries cannot double-execute</h3>
       <p>Stable sha256(case:action) dedup plus locking around check-through-insert; tests assert one ticket per case+action.</p>
       <div class="f">Safe under retry and race</div></div>
-    <div class="card"><div class="k">Graceful degradation</div><h3>No key, bad key, timeout — still runs</h3>
-      <p>select_planner() falls back to the heuristic; a planner that throws mid-run is caught in the reason node.</p>
-      <div class="f">Demo never dies on a network</div></div>
+    <div class="card"><div class="k">Strict failure</div><h3>Provider errors become safe routes</h3>
+      <p>Missing keys, timeouts and malformed responses become explicit workflow state; eval doubles keep CI deterministic.</p>
+      <div class="f">No silent runtime fallback</div></div>
     <div class="card"><div class="k">Bilingual by design</div><h3>EN / VI offline, and re-renderable</h3>
       <p>Deterministic content is templated for both languages; switching language re-renders an existing decision in place.</p>
       <div class="f">No lost in-flight approval</div></div>
@@ -675,21 +674,19 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
         list in the payload; approval mints exactly one idempotent ticket.</p>
       <div class="f">Human approval → idempotent ticket</div></div>
     <div class="card alert"><div class="k">KYC-1044 · ESCALATE COMPLIANCE</div><h3>Sanctions match + prompt injection</h3>
-      <p>A 0.91 screening score triggers a mandatory stop under AML-SCREEN-02 v2026.4. Switch the planner to
-        “adversarial” and the model recommends CLEAR because the case note told it to — the guardrail still
-        overrides it, and no approval token is ever emitted.</p>
-      <div class="f">Compromised model, unchanged outcome</div></div>
+      <p>A 0.91 screening score triggers a mandatory stop under AML-SCREEN-02 v2026.4. Switch to
+        “compromised_demo” and let OpenRouter propose; the guardrail still keeps the stop, and no approval token is emitted.</p>
+      <div class="f">Compromised mode, unchanged outcome</div></div>
   </div>
   <div class="codestrip" style="position:absolute;left:48px;right:48px;bottom:74px">
     <div>uv run python -m app.server          # zero-dependency demo at localhost:8000</div>
-    <div class="hl">uv run python -m app.cli --case KYC-1044 --planner adversarial --lang vi</div>
+    <div class="hl">uv run python -m app.cli --case KYC-1044 --planner compromised_demo</div>
   </div>
   <div class="pagenum">15 / 20</div>
   <aside class="notes" data-src="data/cases.json (KYC-1042, KYC-1044) · app/server.py, static/index.html · app/cli.py · evals/run_evals.py">
-    Run 1042 first and click approve — point out that the approval dialog names the documents. Then run 1044 with
-    the default planner: no approval token, the action is prohibited outright. Then switch the planner dropdown to
-    adversarial and rerun 1044: the model recommends CLEAR, the guardrail forces ESCALATE_COMPLIANCE, and the
-    override banner appears. That banner is the centerpiece of the demo.
+    Run 1042 first, approve, and submit proof of address to show cycle two. Then run 1044 in compromised_demo:
+    OpenRouter may recommend CLEAR, the guardrail forces ESCALATE_COMPLIANCE, and the override banner appears only
+    when the proposal differs. If the live model also escalates, explain independent agreement.
   </aside>
 </section>
 
@@ -729,7 +726,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
         <tr><td>Data</td><td>Stale customer profile</td><td>Freshness metadata</td><td>Retry or abstain</td></tr>
         <tr><td>Retrieval</td><td>Irrelevant policy chunk</td><td>Labelled citation eval</td><td>Hybrid rerank and filter</td></tr>
         <tr><td>Planning</td><td>Hallucinated outcome, wrong tool order</td><td>Trajectory eval, override-rate log</td><td>Prompt / model regression</td></tr>
-        <tr><td>Injection</td><td>Case note instructs the model</td><td>Adversarial planner eval</td><td class="stop">Guardrail override — already enforced</td></tr>
+        <tr><td>Injection</td><td>Case note instructs the model</td><td>Deterministic eval double</td><td class="stop">Guardrail override — already enforced</td></tr>
         <tr><td>Tool</td><td>Timeout or schema violation</td><td>Contract validation</td><td>Retry with a budget</td></tr>
         <tr><td>Policy</td><td>Missing jurisdiction rule</td><td>Rule coverage test</td><td>Block the resolution</td></tr>
         <tr><td>Action</td><td>Duplicate ticket after a retry</td><td>Idempotency check in the gateway</td><td>Return the prior result</td></tr>
@@ -737,16 +734,15 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </table>
     <div class="stats" style="margin-top:26px">
       <div class="stat wide"><div class="h">Unit tests</div><div class="b">31 passing · policy branches, idempotency, i18n, concurrency</div></div>
-      <div class="stat wide"><div class="h">Scenario / safety evals</div><div class="b">25 passing · golden cases, adversarial override, VI rendering</div></div>
+      <div class="stat wide"><div class="h">Scenario / safety evals</div><div class="b">25 passing · golden cases, guardrail route, VI rendering</div></div>
       <div class="stat wide"><div class="h">Honest scope</div><div class="b">No live OpenRouter call in the suite; the adapter is mock-tested</div></div>
     </div>
   </div>
   <div class="pagenum">17 / 20</div>
   <aside class="notes" data-src="tests/test_agent.py · evals/run_evals.py · docs/ARCHITECTURE.md · README.md (Honest scope note)">
     Two things to land here. First, a taxonomy beats a test count: each layer has a detection signal and a defined
-    response. Second, the scope note — every test runs the heuristic or simulated-adversarial planner.
-    OpenRouterPlanner’s prompt construction and structured-output mapping are unit tested with a mocked client,
-    but nothing in this repo makes a real network call. Implemented and adapter-tested, not live-verified.
+    response. Second, CI uses deterministic eval doubles and mocked OpenRouter transport. The opt-in smoke command
+    checks the live provider path when a key is available, so CI and live checks remain separate evidence.
   </aside>
 </section>
 

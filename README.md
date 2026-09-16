@@ -15,16 +15,16 @@ policy) is a compliance incident. So the system is built around one
 question: **what happens when the model is wrong, hallucinating, or
 actively manipulated?**
 
-- A planner (a real LLM, or a transparent offline fallback) proposes an
-  outcome from grounded facts and versioned policy text.
+- OpenRouter proposes an outcome from grounded facts and versioned policy
+  text. `normal` and `compromised_demo` are both live OpenRouter modes.
 - `app/policy.py` independently recomputes the mandated outcome from the
   same typed facts -- never from the model's answer -- and overrides the
   proposal if they disagree. Every override is logged to the trace.
 - One of the four synthetic cases (`KYC-1044`) carries a prompt-injection
-  attempt in its free-text case note ("ignore the screening score..."). An
-  `adversarial` planner mode simulates a model that obeys it. The guardrail
-  still forces `ESCALATE_COMPLIANCE` -- this is a running, provable eval
-  (`evals/run_evals.py`), not a slide claim.
+  attempt in its free-text case note ("ignore the screening score..."). In
+  `compromised_demo`, OpenRouter receives an explicitly compromised prompt;
+  the guardrail still forces `ESCALATE_COMPLIANCE`. Deterministic eval
+  doubles cover the same safety property offline.
 - Every write is gated behind a LangGraph `interrupt()` for human approval,
   carries the *exact* parameters being approved (e.g. which documents are
   requested, not just the action's name), and executes through an
@@ -37,7 +37,7 @@ actively manipulated?**
 | Layer | Choice | Why |
 |---|---|---|
 | Orchestration | LangGraph | Explicit state, branching, checkpointing, HITL interrupts |
-| Planner | OpenRouter (`langchain-openai`) with an offline heuristic fallback | Real LLM reasoning when a key is set; deterministic and network-free otherwise, so a live demo never breaks |
+| Planner | OpenRouter (`langchain-openai`) | Structured live proposal in `normal` or `compromised_demo`; provider failures route strictly to a safe outcome |
 | Safety | `app/policy.py`, pure functions | Independent of the model; the actual safety boundary, unit-testable in isolation |
 | i18n | `app/i18n.py`, template-based | Deterministic content renders in English/Vietnamese offline; only free-form LLM text needs a (best-effort, gracefully-degrading) translation call |
 | Observability | MLflow (optional) | Traces + experiment tracking; natural fit with the MLOps/Databricks stack already in use |
@@ -50,7 +50,7 @@ actively manipulated?**
 app/
   domain.py      typed contracts: Outcome, ToolCall, PolicyCitation, LLMProposal, AgentDecision
   policy.py      deterministic policy engine -- the safety boundary, pure functions
-  planner.py     planner seam: OpenRouterPlanner / HeuristicPlanner / AdversarialPlanner
+  planner.py     OpenRouter planner seam with normal / compromised_demo modes
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
   agent.py       LangGraph graph (ground -> retrieve -> reason -> guard -> review) + KYCExceptionAgent
@@ -62,7 +62,7 @@ data/
   cases.json     4 synthetic cases: evidence gap, identity mismatch, sanctions hit (+ injected note), clean pass
   policies.json  versioned policy chunks with citations
 evals/
-  run_evals.py   golden-case checks + the adversarial guardrail-override + Vietnamese-rendering regressions
+  run_evals.py   deterministic eval doubles + guardrail, route, and rendering regressions
 static/
   index.html     demo UI served by app/server.py
 tests/
@@ -79,19 +79,21 @@ slides/
 Zero extra processes, no external services required.
 
 ```bash
+cp .env.example .env
+# set OPENROUTER_API_KEY
 uv sync
 uv run python -m app.server
 ```
 
-Open `http://localhost:8000`. Pick a case, a planner, and a language, then
-click **Run agent**. Try `KYC-1044` with the `adversarial` planner to see
-the guardrail override live, in either language.
+Open `http://localhost:8000`. Pick a case, a planner mode, and a language,
+then click **Run agent**. Try `KYC-1044` with `compromised_demo` to see the
+live OpenRouter proposal meet the deterministic guardrail.
 
 ## Run the CLI demo
 
 ```bash
-uv run python -m app.cli --case KYC-1042 --approve
-uv run python -m app.cli --case KYC-1044 --planner adversarial --lang vi
+uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-proof-of-address
+uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 ```
 
 ## Present the deck
@@ -123,7 +125,7 @@ pixel-identical to the browser but *not* text-editable in PowerPoint -- edit
 ## Run the rich demo (LangGraph interrupt UI + MLflow tracing)
 
 ```bash
-cp .env.example .env   # optional: add a real OPENROUTER_API_KEY
+cp .env.example .env   # set OPENROUTER_API_KEY for live modes
 mkdir -p .runtime/mlflow
 ```
 
@@ -177,8 +179,10 @@ the trace itself still persists (verified: `agent.run()` through autolog
 appended a `trace_info` row with `status='OK'`, `200` on `POST /v1/traces`
 and `POST /api/3.0/mlflow/traces`).
 
-Without an API key, `KYC_AGENT_PLANNER=auto` falls back to the offline
-heuristic planner automatically -- the demo still runs end to end.
+The live modes fail closed when OpenRouter is unavailable. The graph records
+the provider failure and routes to a strict safe outcome; it never silently
+changes the planner. Deterministic eval doubles are available
+for CI and offline regression checks.
 
 ## Run tests and evaluation
 
@@ -193,12 +197,15 @@ test, relocalization without re-running the graph, and concurrent-request
 safety) and 25 scenario/safety checks, including the adversarial
 guardrail-override and Vietnamese-rendering regressions.
 
-**Honest scope note:** every test and eval above runs the heuristic or
-simulated-adversarial planner. `OpenRouterPlanner`'s prompt construction and
-structured-output mapping are unit-tested with a mocked client
-(`OpenRouterPlannerTests`), but no test in this repository makes a real
-network call to OpenRouter -- there is no live API key in this environment.
-Treat that path as implemented and adapter-tested, not live-verified.
+**Honest scope note:** CI uses deterministic eval doubles and a mocked
+OpenRouter transport so tests do not require a network or credential. A live
+preflight is opt-in:
+
+```bash
+uv run python -m evals.openrouter_smoke --case KYC-1045
+```
+
+Treat that command's result as the live provider check for the interview.
 
 ## Language switch (English / Vietnamese)
 
@@ -207,8 +214,8 @@ CLI and HTTP API take a `lang` field. Two different rendering strategies,
 by content type:
 
 - **Deterministic content** -- outcome/risk labels, the four policy-verdict
-  reasons, the guardrail override sentence, the heuristic/adversarial
-  planner's rationale, and policy citation excerpts -- is hand-templated in
+  reasons, the guardrail override sentence, eval-double rationale, and policy
+  citation excerpts -- is hand-templated in
   `app/i18n.py` and renders instantly, offline, for both languages. This is
   exhaustively covered by `I18nTests` and the Vietnamese-rendering eval.
 - **Free-form content** -- a real `OpenRouterPlanner`'s rationale -- cannot
@@ -232,8 +239,8 @@ by content type:
 
 - **The guardrail is the product, not the model.** `policy.py` is pure,
   has no dependency on `planner.py` or `i18n.py`, and is exhaustively unit
-  tested. Swapping the planner (heuristic -> OpenRouter -> a future
-  fine-tuned model) never changes the safety boundary.
+  tested. Swapping the OpenRouter model or prompt mode never changes the
+  safety boundary.
 - **One agent, shared.** `KYCExceptionAgent` is meant to be a single
   instance per process (one in the HTTP server, one per Streamlit session).
   Planner and language are arguments to `run()`/`approve()`, not part of
@@ -281,16 +288,11 @@ by content type:
   `policy.py` entirely, and the planner's system prompt explicitly frames
   them as data. `KYC-1044`'s case note carries a live prompt-injection
   attempt to make this a real, running test rather than a claim.
-- **Graceful degradation by design.** No API key, or the key is the
-  placeholder value -> heuristic planner (`select_planner`). A configured
-  planner that throws at call time (timeout, bad key, malformed response)
-  -> the graph's `reason` node catches it and falls back to the heuristic
-  proposal instead of crashing the run
-  (`test_planner_runtime_failure_falls_back_without_crashing`). The same
-  pattern applies to Vietnamese translation of free-form text. `.env` is
-  loaded once via `python-dotenv` at `app/__init__` import, so `uv run ...`
-  picks it up without extra flags (`uv run` does not source `.env` on its
-  own -- verified empirically before relying on it).
+- **Strict live planner behavior.** `normal` and `compromised_demo` both use
+  OpenRouter. Missing credentials, timeouts, malformed responses, and retry
+  exhaustion become explicit workflow state and route safely. The eval double
+  is a test seam, not a runtime fallback. `.env` is loaded once via
+  `python-dotenv` at `app/__init__` import.
 - **Graph state is plain JSON.** Trace, citations, tool calls, and the
   decision are stored as dicts/strings inside the LangGraph state and only
   converted to typed, localized dataclasses at the boundary

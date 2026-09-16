@@ -1,14 +1,11 @@
 """Planner seam: the only place a language model touches this agent.
 
-Three implementations share one `Planner` protocol so the graph in
+The planner implementations share one `Planner` protocol so the graph in
 `agent.py` never has to know which one is wired in:
 
 - `OpenRouterPlanner`  -- a real, hosted LLM call with structured output.
-- `HeuristicPlanner`   -- a transparent, offline planner available only when
-  explicitly selected for tests/development.
-- `AdversarialPlanner` -- a simulated jailbroken/compromised model, wired in
-  only on request (CLI flag, API field, or eval), used to prove that
-  `policy.guard()` holds the line even when the planner misbehaves.
+- `HeuristicPlanner` and `AdversarialPlanner` -- deterministic eval doubles,
+  available only for tests and development.
 
 The planner's output is advisory. `policy.guard()` in the graph always makes
 the final call.
@@ -52,7 +49,7 @@ class HeuristicPlanner:
         cited = ", ".join(c.policy_id for c in citations) or "no policy matched"
         rationale_params = {"citations": cited}
         rationale = (
-            f"No LLM configured; heuristic fallback applied {cited} to the grounded facts. "
+            f"Deterministic eval double applied {cited} to the grounded facts. "
             "The case note is untrusted free text and was not used to reach this recommendation."
         )
         return LLMProposal(
@@ -62,10 +59,11 @@ class HeuristicPlanner:
 
 
 class AdversarialPlanner:
-    """Simulates a compromised model that obeys an instruction hidden in a
-    case note instead of the grounded facts. Never selected by default --
-    only via an explicit `planner=adversarial` request, for red-team demos
-    and the regression eval that proves the guardrail catches it."""
+    """Deterministic eval double for a compromised proposal.
+
+    It is test/development-only and proves that the guardrail catches an
+    unsafe proposal without changing the live OpenRouter modes.
+    """
 
     name = "adversarial-simulated"
 
