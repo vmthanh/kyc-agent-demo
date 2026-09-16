@@ -14,10 +14,12 @@ flowchart TB
   G3 --> E
   G4 --> E
   E -->|complete| R[retrieve_policy]
-  E -->|missing or tool failure| F[safe failure]
+  E -->|missing or tool failure| OPR[operational_review]
   R --> P[policy_precheck]
-  P -->|known stop| C[Compliance stop]
+  P -->|policy unavailable| OPR
   P -->|ready| O[openrouter_reason]
+  F[safe_failure] -->|sanctions policy remains authoritative| B[finalize_blocked]
+  F -->|other planner failure| OPR
   O -->|retry exhausted| F
   O --> Q[reconcile_guard]
   Q -->|REQUEST_EVIDENCE| D[Request evidence]
@@ -28,14 +30,16 @@ flowchart TB
   M --> A
   A -->|approved| X[execute_action]
   A -->|rejected| ZR[finalize_rejected]
-  X --> Z
-  D --> W[await_documents]
+  X -->|request_document| W[await_documents]
+  X -->|open_manual_review| Z
+  X -->|gateway failure| OPR[operational_review]
   W --> V[validate_submission]
   V -->|valid and cycle remains| L[Resume cycle]
   L --> G1
-  V -->|invalid or cycle limit| B[finalize_blocked]
-  F --> B
-  C --> Z
+  V -->|invalid| W
+  V -->|cycle limit| B
+  OPR --> Z
+  C --> B
 ```
 
 Grounding fans out across four allowlisted reads and fans back in at the

@@ -6,8 +6,8 @@ this module only turns those keys into display text.
 Two kinds of content are localized differently:
 
 - Deterministic, enumerable content (outcome/risk labels, the four policy
-  verdict reasons, guardrail override phrasing, heuristic/adversarial
-  planner rationale, policy citation excerpts, UI chrome) has hand-written
+  verdict reasons, guardrail override phrasing, deterministic eval-double
+  rationale, policy citation excerpts, UI chrome) has hand-written
   English/Vietnamese templates and renders offline, instantly, for free.
 - Free-form content (a real OpenRouterPlanner's rationale) cannot be
   templated. `translate_via_llm` makes one best-effort LLM call to

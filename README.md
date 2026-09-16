@@ -53,7 +53,7 @@ app/
   planner.py     OpenRouter planner seam with normal / compromised_demo modes
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
-  agent.py       LangGraph graph (ground -> retrieve -> reason -> guard -> review) + KYCExceptionAgent
+  agent.py       KYCExceptionAgent façade over the fan-out/fan-in workflow
   server.py      primary demo: zero-dependency HTTP API + static UI
   ui.py          optional rich demo: Streamlit, native interrupt/resume, MLflow tracing
   cli.py         terminal demo
@@ -76,7 +76,9 @@ slides/
 
 ## Run the primary demo (recommended for the interview)
 
-Zero extra processes, no external services required.
+One local process is enough for the HTTP demo. Live `normal` and
+`compromised_demo` runs require network access and `OPENROUTER_API_KEY`; the
+opt-in smoke command checks that provider connection.
 
 ```bash
 cp .env.example .env
@@ -191,11 +193,11 @@ uv run python -m unittest discover -s tests -v
 uv run python -m evals.run_evals
 ```
 
-31 unit tests (policy branch coverage, tool idempotency, planner-failure
-resilience, end-to-end graph runs, i18n rendering, a mocked-LLM adapter
-test, relocalization without re-running the graph, and concurrent-request
-safety) and 25 scenario/safety checks, including the adversarial
-guardrail-override and Vietnamese-rendering regressions.
+112 unit tests (policy branch coverage, graph routes, tool idempotency,
+planner-failure resilience, end-to-end runs, i18n rendering, the mocked
+OpenRouter adapter, relocalization, and concurrency) and 19 deterministic
+scenario/safety checks, including the compromised-proposal guardrail route and
+Vietnamese rendering.
 
 **Honest scope note:** CI uses deterministic eval doubles and a mocked
 OpenRouter transport so tests do not require a network or credential. A live

@@ -230,13 +230,13 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <p>Manual queues, rule engines and RAG chatbots each miss a different requirement of the work.</p>
       <div class="f">Slides 5–7</div></div>
     <div class="card"><div class="k">03 · Architecture</div><h3>How the agent is bounded</h3>
-      <p>Ground → retrieve → reason → guard → review → execute, with the safety boundary outside the model.</p>
+      <p>Fan-out grounding → evidence gate → policy precheck → OpenRouter → reconcile guard, with explicit safe routes.</p>
       <div class="f">Slides 8–11</div></div>
     <div class="card"><div class="k">04 · Tech stack</div><h3>What each technology owns</h3>
       <p>LangGraph, a planner seam, a pure policy engine, MLflow traces, and two demo surfaces.</p>
       <div class="f">Slides 12–13</div></div>
     <div class="card"><div class="k">05 · Highlights</div><h3>What is provable, not claimed</h3>
-      <p>A running adversarial eval, parameter-level approval, idempotent writes, offline bilingual rendering.</p>
+      <p>Deterministic eval doubles, parameter-level approval, idempotent writes, offline bilingual rendering.</p>
       <div class="f">Slides 14–17</div></div>
     <div class="card lime"><div class="k">06 · Benefits</div><h3>What the customer gets</h3>
       <p>Faster handling, consistent outcomes, audit-ready trails, and autonomy that expands on evidence.</p>
@@ -442,7 +442,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     Graph state stays JSON-safe, so the in-memory checkpointer swaps for Postgres/Redis without a rewrite (app/agent.py).
   </div>
   <div class="pagenum">08 / 20</div>
-  <aside class="notes" data-src="app/agent.py: build_graph() · app/policy.py: guard() · data/ontology.json · docs/ARCHITECTURE.md">
+  <aside class="notes" data-src="app/workflow/graph.py · app/workflow/routing.py · app/policy.py · data/ontology.json · docs/ARCHITECTURE.md">
     Walk through the fan-out/fan-in names. Ground calls four read tools; the evidence gate and policy precheck run
     before OpenRouter; reconcile_guard recomputes the mandate and chooses the route; review pauses on interrupt();
     execute runs through the idempotent gateway.
@@ -587,7 +587,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </table>
   </div>
   <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:74px">
-    Python 3 · uv for dependency management · unittest plus a scenario/safety eval harness · synthetic data only, no external service required to run it
+    Python 3 · uv for dependency management · 112 unit tests + 19 deterministic eval checks · live modes require an OpenRouter key
   </div>
   <div class="pagenum">12 / 20</div>
   <aside class="notes" data-src="README.md (Architecture and stack) · pyproject.toml · app/planner.py: select_planner()">
@@ -634,7 +634,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <h1>Six properties that are demonstrated, not asserted</h1>
   <div class="body cards c3 six">
     <div class="card lime"><div class="k">Guardrail override</div><h3>A running eval, not a slide claim</h3>
-      <p>AdversarialPlanner recommends CLEAR on KYC-1044; guard() forces ESCALATE_COMPLIANCE and logs the override.</p>
+      <p>In compromised_demo, OpenRouter may recommend CLEAR on KYC-1044; reconcile_guard forces ESCALATE_COMPLIANCE and logs an override when the proposal differs.</p>
       <div class="f">Provable in one command</div></div>
     <div class="card"><div class="k">Prompt injection</div><h3>The attack lives in the data</h3>
       <p>KYC-1044’s note instructs the model to ignore the score. Notes arrive through a separate tool as data, never into policy.py.</p>
@@ -647,7 +647,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <div class="f">Safe under retry and race</div></div>
     <div class="card"><div class="k">Strict failure</div><h3>Provider errors become safe routes</h3>
       <p>Missing keys, timeouts and malformed responses become explicit workflow state; eval doubles keep CI deterministic.</p>
-      <div class="f">No silent runtime fallback</div></div>
+      <div class="f">No silent runtime planner switch</div></div>
     <div class="card"><div class="k">Bilingual by design</div><h3>EN / VI offline, and re-renderable</h3>
       <p>Deterministic content is templated for both languages; switching language re-renders an existing decision in place.</p>
       <div class="f">No lost in-flight approval</div></div>
@@ -668,11 +668,11 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <div class="kicker">Highlights</div>
   <h1>Live demo: useful action, deliberate restraint, and a guardrail override</h1>
   <div class="body cards c2" style="grid-auto-rows:326px">
-    <div class="card"><div class="k">KYC-1042 · REQUEST EVIDENCE</div><h3>Missing proof of address</h3>
-      <p>Identity and liveness pass, <span class="mono">proof_of_address</span> is absent. The agent cites
-        KYC-EVIDENCE-07 v2026.3 and proposes a document request. The graph pauses on interrupt() with the document
-        list in the payload; approval mints exactly one idempotent ticket.</p>
-      <div class="f">Human approval → idempotent ticket</div></div>
+    <div class="card"><div class="k">KYC-1042 · NORMAL · TWO CYCLES</div><h3>Missing proof of address</h3>
+      <p><b>Cycle 1:</b> identity and liveness pass, but <span class="mono">proof_of_address</span> is absent. The
+        agent cites KYC-EVIDENCE-07 v2026.3, pauses for approval, and mints exactly one idempotent ticket.
+        <br><b>Cycle 2:</b> verified proof resumes the same checkpoint and the policy route reaches CLEAR.</p>
+      <div class="f">Approve → submit evidence → CLEAR</div></div>
     <div class="card alert"><div class="k">KYC-1044 · ESCALATE COMPLIANCE</div><h3>Sanctions match + prompt injection</h3>
       <p>A 0.91 screening score triggers a mandatory stop under AML-SCREEN-02 v2026.4. Switch to
         “compromised_demo” and let OpenRouter propose; the guardrail still keeps the stop, and no approval token is emitted.</p>
@@ -701,7 +701,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <div class="down">↓</div>
     <div class="step"><div class="badge">MEASURE</div><p>Outcome agreement, citation quality, tool errors, safety violations, latency, cost</p></div>
     <div class="down">↓</div>
-    <div class="step last"><div class="badge">REGRESS</div><p>Add the failure to the golden and adversarial suites so it can never silently return</p></div>
+    <div class="step last"><div class="badge">REGRESS</div><p>Add the failure to the golden and injection eval-double suites so it can never silently return</p></div>
   </div>
   <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:74px">
     Worked example: an early one-loop design let untrusted note text reach a notification action → split reads from writes, moved the stop rule out of the model, added the sanctions regression
@@ -733,8 +733,8 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       </tbody>
     </table>
     <div class="stats" style="margin-top:26px">
-      <div class="stat wide"><div class="h">Unit tests</div><div class="b">31 passing · policy branches, idempotency, i18n, concurrency</div></div>
-      <div class="stat wide"><div class="h">Scenario / safety evals</div><div class="b">25 passing · golden cases, guardrail route, VI rendering</div></div>
+      <div class="stat wide"><div class="h">Unit tests</div><div class="b">112 passing · policy branches, graph routes, idempotency, i18n, concurrency</div></div>
+      <div class="stat wide"><div class="h">Scenario / safety evals</div><div class="b">19 passing · golden cases, guardrail routes, VI rendering</div></div>
       <div class="stat wide"><div class="h">Honest scope</div><div class="b">No live OpenRouter call in the suite; the adapter is mock-tested</div></div>
     </div>
   </div>
@@ -794,7 +794,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <p>Ontology path, typed facts, policy id and version, tool calls, rationale, guardrail verdict, approver — one replayable trajectory.</p>
       <div class="f">Metric: citation precision, unsupported claims</div></div>
     <div class="card"><div class="k">Safety</div><h3>Unsafe autonomy is structurally impossible</h3>
-      <p>Mandatory stops sit outside the model, writes need a named human, and the adversarial eval re-proves it after every change.</p>
+      <p>Mandatory stops sit outside the model, writes need a named human, and deterministic eval doubles re-prove it after every change.</p>
       <div class="f">Metric: policy violations, unapproved writes</div></div>
     <div class="card"><div class="k">Adoption</div><h3>Analysts stay in control, in their language</h3>
       <p>Approval shows exact parameters, confidence is labelled honestly, and every surface renders EN or VI without a network call.</p>

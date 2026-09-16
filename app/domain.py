@@ -76,11 +76,11 @@ class TraceEvent:
 
 @dataclass(frozen=True)
 class LLMProposal:
-    """What the planner (LLM or fallback) recommends. Advisory only -- the
+    """What the planner (live OpenRouter or eval double) recommends. Advisory only -- the
     deterministic guardrail in `policy.py` always has the final word.
 
     `rationale` is always English. `rationale_key` + `rationale_params` are
-    set only by template-based planners (heuristic, adversarial) so their
+    set only by deterministic eval doubles so their
     rationale can be rendered in another language offline; a real LLM's
     free-form `rationale` has no key and needs a live translation call.
     """

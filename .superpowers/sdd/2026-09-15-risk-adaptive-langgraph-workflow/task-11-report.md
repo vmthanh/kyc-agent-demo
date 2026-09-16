@@ -31,3 +31,18 @@ global uv cache is outside the permitted filesystem. The equivalent checked-in
 `.venv` test runner passed. Headless Chrome was unavailable in this runtime;
 the HTML deck was structurally checked by the concise-deck suite and all
 changed slide markup was reviewed directly.
+
+## Reviewer follow-up
+
+- Corrected Mermaid edges to match `route_after_*` behavior, including the
+  action gateway, document wait/resume loop, operational handoff, and strict
+  safe-failure routes.
+- Removed stale `build_graph`, linear-chain, and live `AdversarialPlanner`
+  claims from the README and full deck. Live mode is explicitly OpenRouter;
+  compromised proposals are described as `compromised_demo`, while eval
+  doubles remain offline-only.
+- Clarified that the HTTP demo needs one local process, while live modes need
+  an OpenRouter key/network connection.
+- Updated visible verification counts to 112 unit tests and 19 deterministic
+  eval checks, and added the KYC-1042 cycle-one/cycle-two story to the full
+  deck.

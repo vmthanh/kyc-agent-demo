@@ -82,7 +82,7 @@ route is correct.” Do not claim an override occurred when it did not.
 Explain that tool and planner retries have bounded budgets. A timeout,
 malformed structured response, missing key, or exhausted retry becomes an
 explicit planner failure and routes to a safe final state. The runtime never
-silently swaps in a heuristic planner. Deterministic eval doubles and mocked
+silently swaps in another runtime planner. Deterministic eval doubles and mocked
 OpenRouter transport keep CI offline, while `evals.openrouter_smoke` is the
 opt-in live check.
 
@@ -104,4 +104,4 @@ the model, and reconcile again after the proposal.
 
 **What happens when the provider is down?** The graph records the failure and
 uses a strict safe route. The offline deterministic path is an eval double,
-not a production fallback.
+not a production planner fallback.

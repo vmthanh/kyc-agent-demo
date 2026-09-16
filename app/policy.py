@@ -3,8 +3,8 @@
 This module is the safety boundary of the agent. It is pure (no I/O, no
 model calls, no language) and cheap to unit test exhaustively. `evaluate()`
 computes the mandated outcome directly from typed, tool-sourced facts.
-`guard()` compares that mandate against whatever the planner (LLM or
-fallback) proposed and always keeps the mandate -- the model may explain and
+`guard()` compares that mandate against the live planner or an eval double
+and always keeps the mandate -- the model may explain and
 add nuance, but it can never talk its way past a compliance stop, an
 identity conflict, or an evidence gap, even if the case note tries to
 instruct it to.

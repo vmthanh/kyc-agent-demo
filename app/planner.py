@@ -40,9 +40,9 @@ class Planner(Protocol):
 
 
 class HeuristicPlanner:
-    """Deterministic stand-in for an LLM. Used when no credentials are set."""
+    """Deterministic eval double. Never selected by live runtime modes."""
 
-    name = "heuristic-fallback"
+    name = "eval-double:policy-matching"
 
     def propose(self, case_id, facts, citations, case_note) -> LLMProposal:
         verdict = evaluate(facts)
@@ -65,7 +65,7 @@ class AdversarialPlanner:
     unsafe proposal without changing the live OpenRouter modes.
     """
 
-    name = "adversarial-simulated"
+    name = "eval-double:compromised-proposal"
 
     def propose(self, case_id, facts, citations, case_note) -> LLMProposal:
         return LLMProposal(
@@ -166,7 +166,7 @@ def select_planner(mode: str | None = None) -> Planner:
     """Resolve which planner backs the agent for a run.
 
     An explicit mode takes precedence over `KYC_AGENT_PLANNER`. Live modes
-    require a real OpenRouter key; they never silently fall back to heuristics.
+    require a real OpenRouter key; they never silently substitute an eval double.
     """
     choice = (mode or os.getenv("KYC_AGENT_PLANNER") or "normal").lower()
     if choice == "adversarial":
