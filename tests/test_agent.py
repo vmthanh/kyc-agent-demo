@@ -189,6 +189,9 @@ class StaticDemoTests(unittest.TestCase):
         self.assertIn("document_submission", source)
         self.assertIn("operational_review", source)
         self.assertIn("workflow-node active", source)
+        self.assertIn("d.guardrail_override", source)
+        self.assertIn("text('override')", source)
+        self.assertIn("d.proposal_confidence != null", source)
         self.assertNotIn("heuristic (offline", source)
 
     def test_approval_is_bound_to_the_rendered_case_and_stale_responses_are_ignored(self) -> None:
