@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app.agent import KYCExceptionAgent
 from app.domain import Outcome, PendingTaskKind, WorkflowStatus
@@ -12,6 +13,12 @@ from evals.planners import (
 
 
 class WorkflowEvalDoubleTests(unittest.TestCase):
+    def test_smoke_strips_placeholder_key_before_gating(self) -> None:
+        from evals.openrouter_smoke import main
+
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "  your_key_here  "}, clear=False):
+            self.assertEqual(main(["--case", "KYC-1045"]), 2)
+
     def test_policy_matching_eval_planner_matches_deterministic_policy(self) -> None:
         proposal = PolicyMatchingEvalPlanner().propose(
             "KYC-1045",

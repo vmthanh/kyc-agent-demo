@@ -45,11 +45,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mode", choices=("normal", "compromised_demo"), default="normal")
     args = parser.parse_args(argv)
 
-    if not os.getenv("OPENROUTER_API_KEY", "").strip() or os.getenv("OPENROUTER_API_KEY") == "your_key_here":
+    raw_api_key = os.getenv("OPENROUTER_API_KEY", "")
+    api_key = raw_api_key.strip()
+    if not api_key or api_key == "your_key_here":
         print("OPENROUTER_API_KEY is required for the live smoke preflight", file=sys.stderr)
         return 2
 
     try:
+        # OpenRouterPlanner reads its credential from the environment. Keep
+        # the provider call aligned with the normalized value used above,
+        # while restoring the caller's environment after the preflight.
+        os.environ["OPENROUTER_API_KEY"] = api_key
         facts, citations, case_note = _ground_case(args.case)
         planner = OpenRouterPlanner(compromised=args.mode == "compromised_demo")
         started = perf_counter()
@@ -59,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"OpenRouter smoke preflight failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
+    finally:
+        os.environ["OPENROUTER_API_KEY"] = raw_api_key
 
     usage = proposal.usage
     token_text = "/".join(str(usage.get(key, "n/a")) for key in ("input_tokens", "output_tokens", "total_tokens"))
