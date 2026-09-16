@@ -390,13 +390,14 @@ class OpenRouterPlannerTests(unittest.TestCase):
                 # The case note must be present but explicitly marked untrusted.
                 user_message = messages[1][1]
                 assert "untrusted" in user_message
-                return FakeStructuredResponse()
+                return {"parsed": FakeStructuredResponse(), "raw": None, "parsing_error": None}
 
         class FakeChatOpenAI:
             def __init__(self, **kwargs):
                 pass
 
-            def with_structured_output(self, schema):
+            def with_structured_output(self, schema, include_raw=False):
+                assert include_raw
                 return FakeStructuredClient()
 
         with patch("app.planner.os.environ", {"OPENROUTER_API_KEY": "test-key"}), \
