@@ -86,9 +86,11 @@ The graph exposes three pending-task kinds:
 
 `cycle_count` starts at one. A valid document submission routes to
 `increment_cycle`, then repeats grounding, retrieval, precheck, OpenRouter,
-and guard. `max_cycles` defaults to two. Invalid evidence or an exhausted
-cycle budget routes to `finalize_blocked`; a sanctions stop routes directly to
-`finalize` with no approval token.
+and guard. `max_cycles` defaults to two. Invalid evidence loops back to
+`await_documents` for another submission. If `REQUEST_EVIDENCE` reaches the
+cycle limit, the graph pauses at `operational_review`; acknowledgement then
+continues to `finalize`/`COMPLETED`. A sanctions stop routes to
+`finalize_blocked` with no approval token.
 
 ## Payload-aware idempotency
 
