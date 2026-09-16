@@ -17,3 +17,8 @@ class WorkflowSurfaceTests(unittest.TestCase):
         self.assertIn("--submit-proof-of-address", source)
         self.assertIn("compromised_demo", source)
 
+    def test_cli_can_acknowledge_operational_handoff(self) -> None:
+        source = (ROOT / "app" / "cli.py").read_text()
+        self.assertIn("--acknowledge-handoff", source)
+        self.assertIn('PendingTaskKind.OPERATIONAL_REVIEW', source)
+        self.assertIn('"acknowledged": True', source)

@@ -22,6 +22,10 @@ def main() -> None:
         "--submit-proof-of-address", action="store_true",
         help="Submit verified proof of address after approving the evidence request.",
     )
+    parser.add_argument(
+        "--acknowledge-handoff", action="store_true",
+        help="Acknowledge an operational handoff after the workflow pauses for review.",
+    )
     args = parser.parse_args()
 
     agent = KYCExceptionAgent()
@@ -38,6 +42,12 @@ def main() -> None:
         decision = agent.resume(
             decision.pending_task.interrupt_key,
             {"approved": False, "reason": args.reject},
+            lang=args.lang,
+        )
+    if args.acknowledge_handoff and decision.pending_task and decision.pending_task.kind is PendingTaskKind.OPERATIONAL_REVIEW:
+        decision = agent.resume(
+            decision.pending_task.interrupt_key,
+            {"acknowledged": True},
             lang=args.lang,
         )
     print(json.dumps(decision.to_dict(), indent=2, ensure_ascii=False))
