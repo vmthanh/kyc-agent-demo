@@ -51,16 +51,23 @@ class Handler(BaseHTTPRequestHandler):
         try:
             size = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(size) or b"{}")
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
             if self.path == "/api/run":
-                planner_mode = payload.get("planner_mode", payload.get("planner", "normal"))
-                if not isinstance(planner_mode, str):
-                    raise ValueError("planner_mode must be a string")
-                if planner_mode not in {"normal", "compromised_demo"}:
-                    raise ValueError(f"Unknown planner mode: {planner_mode}")
+                explicit_mode = "planner_mode" in payload
+                planner_mode = payload.get("planner_mode") if explicit_mode else payload.get("planner", "normal")
+                if explicit_mode:
+                    if not isinstance(planner_mode, str):
+                        raise ValueError("planner_mode must be a string")
+                    if planner_mode not in {"normal", "compromised_demo"}:
+                        raise ValueError(f"Unknown planner mode: {planner_mode}")
+                lang = payload.get("lang", "en")
+                if not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.run(
                     str(payload["case_id"]),
                     planner_name=payload.get("planner"),
-                    lang=str(payload.get("lang", "en")),
+                    lang=lang,
                     planner_mode=planner_mode,
                 )
                 return self._json(decision.to_dict())
@@ -69,21 +76,31 @@ class Handler(BaseHTTPRequestHandler):
                 response = payload["response"]
                 if not isinstance(response, dict):
                     raise ValueError("response must be an object")
-                decision = AGENT.resume(interrupt_key, dict(response), lang=payload.get("lang"))
+                lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
+                decision = AGENT.resume(interrupt_key, dict(response), lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/approve":
                 key = str(payload["approval_key"])
                 lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.approve(key, lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/reject":
                 key = str(payload["approval_key"])
                 reason = str(payload["reason"])
                 lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.reject(key, reason, lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/relocalize":
-                decision = AGENT.relocalize(str(payload["decision_id"]), str(payload.get("lang", "en")))
+                lang = payload.get("lang", "en")
+                if not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
+                decision = AGENT.relocalize(str(payload["decision_id"]), lang)
                 return self._json(decision.to_dict())
             self.send_error(404)
         except KeyError as exc:

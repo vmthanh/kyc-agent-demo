@@ -49,3 +49,21 @@ class WorkflowAPITests(unittest.TestCase):
         handler = self.make_handler("/api/run", {"planner_mode": "normal"})
         handler.do_POST()
         self.assertEqual(handler.response[1], 400)
+
+    def test_legacy_heuristic_planner_is_not_treated_as_new_mode(self) -> None:
+        handler = self.make_handler("/api/run", {"case_id": "KYC-1045", "planner": "heuristic"})
+        fake = type("Decision", (), {"to_dict": lambda self: {"workflow_status": "COMPLETED"}})()
+        with patch("app.server.AGENT.run", return_value=fake) as run:
+            handler.do_POST()
+        self.assertEqual(handler.response[1], 200)
+        self.assertEqual(run.call_args.kwargs["planner_name"], "heuristic")
+
+    def test_array_json_body_is_a_json_bad_request(self) -> None:
+        body = json.dumps([]).encode()
+        handler = object.__new__(Handler)
+        handler.headers = {"Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.path = "/api/run"
+        handler._json = lambda value, status=200: setattr(handler, "response", (value, status))
+        handler.do_POST()
+        self.assertEqual(handler.response[1], 400)
