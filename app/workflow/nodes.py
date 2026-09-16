@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..domain import LLMProposal, Outcome, PolicyCitation
-from ..planner import Planner, PlannerUnavailableError
+from ..planner import Planner
 from ..policy import PolicyVerdict, evaluate, guard_verdict, tags_for
 from ..tools import DomainTools
 from .state import WorkflowState
@@ -80,8 +80,18 @@ class WorkflowNodes:
             raise ValueError("case_id is required")
         if state.get("lang", "en") not in {"en", "vi"}:
             raise ValueError("unsupported language")
+        if state.get("planner_mode") not in {"normal", "compromised_demo"}:
+            raise ValueError("unsupported planner mode")
+        max_cycles = int(state.get("max_cycles", 2))
+        if max_cycles < 1:
+            raise ValueError("max_cycles must be at least 1")
         return {
+            "workflow_status": "RUNNING",
             "current_node": "intake",
+            "cycle_count": 1,
+            "max_cycles": max_cycles,
+            "planner_status": "pending",
+            "planner_attempts": 0,
             "trace": [self._event(state, "intake", "Initialize case run", "Validated workflow input", runtime=runtime)],
         }
 
@@ -201,10 +211,12 @@ class WorkflowNodes:
             "reason_key": result.verdict.reason_key,
             "reason_params": result.verdict.reason_params,
             "action_payload": payload,
+            "guardrail_override": result.override_info,
         }
         return {
             "decision": decision,
             "action_payload": payload,
+            "guardrail_override": result.override_info,
             "trace": [self._event(state, "reconcile_guard", "Apply deterministic guard", "Model proposal reconciled with policy", "override" if result.override_info else "complete", runtime)],
         }
 

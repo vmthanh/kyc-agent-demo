@@ -12,3 +12,9 @@ Verification:
 .venv/bin/python -m unittest tests.test_workflow_nodes tests.test_agent.PolicyTests tests.test_workflow_contracts -v
 Ran 16 tests ... OK
 ```
+
+Follow-up review fixes:
+
+- `intake` now validates the two supported planner modes and emits initialized workflow counters.
+- Added direct tests for planner/tool error sanitization, reconciliation override metadata, and sanctions safe-failure preservation.
+- Reconciliation now retains the advisory model and final deterministic outcome/action in `guardrail_override` metadata on both the decision and state update.

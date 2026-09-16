@@ -34,6 +34,7 @@ class WorkflowState(TypedDict, total=False):
     planner_attempts: int
     planner_error: dict[str, Any] | None
     decision: dict[str, Any] | None
+    guardrail_override: dict[str, Any] | None
     action_payload: dict[str, Any] | None
     review_result: dict[str, Any] | None
     action_result: dict[str, Any] | None
