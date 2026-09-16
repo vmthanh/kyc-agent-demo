@@ -194,7 +194,7 @@ uv run python -m unittest discover -s tests -v
 uv run python -m evals.run_evals
 ```
 
-112 unit tests (policy branch coverage, graph routes, tool idempotency,
+114 unit tests (policy branch coverage, graph routes, tool idempotency,
 planner-failure resilience, end-to-end runs, i18n rendering, the mocked
 OpenRouter adapter, relocalization, and concurrency) and 19 deterministic
 scenario/safety checks, including the compromised-proposal guardrail route and
@@ -248,10 +248,11 @@ by content type:
   instance per process (one in the HTTP server, one per Streamlit session).
   Planner and language are arguments to `run()`/`approve()`, not part of
   construction, and each run's interrupt gets a globally-unique approval
-  handle (LangGraph's own interrupt id) instead of a case+action-derived
-  key. An earlier revision kept one `KYCExceptionAgent` per planner choice;
-  that made approving a run ambiguous whenever two planners touched the
-  same case+action. `test_switching_planner_between_runs_does_not_break_approval`
+  handle (LangGraph's own interrupt id) instead of a payload-derived gateway
+  key. The gateway key hashes the canonical case, action, requested fields,
+  and policy versions. An earlier revision kept one `KYCExceptionAgent` per
+  planner choice; that made approving a run ambiguous whenever two planners
+  touched the same payload. `test_switching_planner_between_runs_does_not_break_approval`
   and `test_two_runs_of_the_same_case_get_independent_approval_handles`
   pin the fix.
 - **Thread-safe under `ThreadingHTTPServer`.** The shared agent uses one
@@ -306,10 +307,10 @@ by content type:
   a human-facing prompt at the moment it pauses).
 - **Read/write separation.** Read-only tools run automatically inside the
   graph. Every write pauses on a LangGraph `interrupt()` and executes only
-  after approval, through an idempotency-keyed action gateway (keyed by
-  case+action, deliberately independent of the per-run approval handle, so
-  approving two different runs of the same case+action still produces one
-  ticket).
+  after approval, through an idempotency-keyed action gateway. The key is
+  payload- and policy-version-sensitive, deliberately independent of the
+  per-run approval handle, so identical retries replay one ticket while a
+  materially changed request gets a distinct key.
 - **Synthetic data only.** No bank or customer information is included.
 
 ## Production seam

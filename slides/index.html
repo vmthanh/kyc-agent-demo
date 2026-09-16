@@ -359,7 +359,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
         <tr><td>Versioned policy citation</td><td>Rules live in code</td><td>Retrieved text, unverified</td><td><span class="mono">policy_id</span> + <span class="mono">version</span> on every decision</td></tr>
         <tr><td>Independent policy enforcement</td><td>Is the rule</td><td>Prompt-level only</td><td><span class="mono">policy.py</span> recomputes and overrides</td></tr>
         <tr><td>Human approval before a write</td><td>Rarely modelled</td><td>Not modelled</td><td>LangGraph <span class="mono">interrupt()</span> with full payload</td></tr>
-        <tr><td>Idempotent side effects</td><td>Ad hoc</td><td>Not modelled</td><td>Stable <span class="mono">sha256(case:action)</span> dedup key</td></tr>
+        <tr><td>Idempotent side effects</td><td>Ad hoc</td><td>Not modelled</td><td>Payload + policy-version-sensitive <span class="mono">sha256</span> key</td></tr>
         <tr><td>Replayable audit trajectory</td><td>Logs only</td><td>Chat transcript</td><td>Typed trace: facts, tools, verdict, override</td></tr>
       </tbody>
     </table>
@@ -561,8 +561,8 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <div class="pagenum">11 / 20</div>
   <aside class="notes" data-src="app/agent.py (_pending, approve) · app/tools.py: execute_approved_action · tests/test_agent.py · docs/ARCHITECTURE.md">
     The two-key design is the detail worth dwelling on. A reviewer’s approval handle must be unique per run or
-    approving one run could resume another; the gateway’s dedup key must be stable per case+action or retries mint
-    duplicate tickets. Different lifetimes, different keys. And I am explicit that an in-process lock is a
+    approving one run could resume another; the gateway’s dedup key hashes the canonical payload and policy versions
+    so retries replay one ticket while changed requests get a distinct key. Different lifetimes, different keys. And I am explicit that an in-process lock is a
     demo-scoped answer.
   </aside>
 </section>
@@ -587,7 +587,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </table>
   </div>
   <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:74px">
-    Python 3 · uv for dependency management · 112 unit tests + 19 deterministic eval checks · live modes require an OpenRouter key
+    Python 3 · uv for dependency management · 114 unit tests + 19 deterministic eval checks · live modes require an OpenRouter key
   </div>
   <div class="pagenum">12 / 20</div>
   <aside class="notes" data-src="README.md (Architecture and stack) · pyproject.toml · app/planner.py: select_planner()">
@@ -643,7 +643,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <p>Interrupt payload and ticket both carry the exact documents requested, so a reviewer’s click has a defined scope.</p>
       <div class="f">Auditable consent</div></div>
     <div class="card"><div class="k">Idempotent writes</div><h3>Retries cannot double-execute</h3>
-      <p>Stable sha256(case:action) dedup plus locking around check-through-insert; tests assert one ticket per case+action.</p>
+      <p>Payload- and policy-version-sensitive sha256 dedup plus locking around check-through-insert; tests assert one ticket per identical request.</p>
       <div class="f">Safe under retry and race</div></div>
     <div class="card"><div class="k">Strict failure</div><h3>Provider errors become safe routes</h3>
       <p>Missing keys fail at planner selection; timeouts and malformed responses after construction become explicit workflow state. Eval doubles keep CI deterministic.</p>
@@ -733,7 +733,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       </tbody>
     </table>
     <div class="stats" style="margin-top:26px">
-      <div class="stat wide"><div class="h">Unit tests</div><div class="b">112 passing · policy branches, graph routes, idempotency, i18n, concurrency</div></div>
+      <div class="stat wide"><div class="h">Unit tests</div><div class="b">114 passing · policy branches, graph routes, idempotency, i18n, concurrency</div></div>
       <div class="stat wide"><div class="h">Scenario / safety evals</div><div class="b">19 passing · golden cases, guardrail routes, VI rendering</div></div>
       <div class="stat wide"><div class="h">Honest scope</div><div class="b">No live OpenRouter call in the suite; the adapter is mock-tested</div></div>
     </div>

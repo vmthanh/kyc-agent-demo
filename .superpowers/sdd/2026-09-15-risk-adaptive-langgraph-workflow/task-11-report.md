@@ -22,7 +22,7 @@
 
 ```text
 .venv/bin/python -m unittest discover -s tests -v
-Ran 112 tests in 9.861s
+Ran 114 tests in 10.026s
 OK
 ```
 
@@ -43,9 +43,12 @@ changed slide markup was reviewed directly.
   doubles remain offline-only.
 - Clarified that the HTTP demo needs one local process, while live modes need
   an OpenRouter key/network connection.
-- Updated visible verification counts to 112 unit tests and 19 deterministic
+- Updated visible verification counts to 114 unit tests and 19 deterministic
   eval checks, and added the KYC-1042 cycle-one/cycle-two story to the full
   deck.
+- Added an explicit `CLEAR` guard outcome beside the separate Resume cycle
+  evidence loop, and documented the payload- and policy-version-sensitive
+  idempotency key.
 - Final topology pass: max-cycle `REQUEST_EVIDENCE` now routes to
   `operational_review`, invalid document submissions loop at
   `validate_submission`, and sanctions failures terminate at
