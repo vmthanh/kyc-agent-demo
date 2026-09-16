@@ -57,6 +57,13 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "requested_documents": "Requested documents",
         "workflow_status": "Workflow status",
         "current_node": "Current step",
+        "planner_normal": "Normal planner",
+        "planner_compromised": "Compromised demo",
+        "planner_help": "Choose the normal live planner or the compromised demo mode.",
+        "compromised_warning": "Compromised demo mode is active; deterministic policy remains authoritative.",
+        "submit_documents": "Submit verified proof of address",
+        "acknowledge_handoff": "Acknowledge operational handoff",
+        "not_available": "n/a",
         "cycle": "Evaluation cycle",
         "pending_document_submission": "Document submission required",
         "operational_handoff": "Operational review required",
@@ -95,6 +102,13 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "requested_documents": "Hồ sơ được yêu cầu bổ sung",
         "workflow_status": "Trạng thái quy trình",
         "current_node": "Bước hiện tại",
+        "planner_normal": "Bộ lập luận bình thường",
+        "planner_compromised": "Mô phỏng bộ lập luận bị xâm nhập",
+        "planner_help": "Chọn bộ lập luận trực tiếp bình thường hoặc chế độ mô phỏng bị xâm nhập.",
+        "compromised_warning": "Đang bật chế độ mô phỏng bị xâm nhập; chính sách xác định vẫn là nguồn có thẩm quyền.",
+        "submit_documents": "Gửi chứng minh địa chỉ đã xác minh",
+        "acknowledge_handoff": "Xác nhận chuyển rà soát vận hành",
+        "not_available": "không có",
         "cycle": "Vòng đánh giá",
         "pending_document_submission": "Cần bổ sung tài liệu",
         "operational_handoff": "Cần chuyển rà soát vận hành",
@@ -280,22 +294,23 @@ def render_facts(facts: dict, lang: str) -> list[str]:
 # ---------------------------------------------------------------------------
 RATIONALE_TEMPLATES: dict[str, dict[str, str]] = {
     "heuristic_applied": {
-        "en": "No LLM configured; heuristic fallback applied {citations} to the grounded facts. "
+        "en": "The offline planner applied {citations} to the grounded facts. "
         "The case note is untrusted free text and was not used to reach this recommendation.",
-        "vi": "Chưa cấu hình mô hình ngôn ngữ; hệ thống dự phòng đã áp dụng {citations} dựa trên "
+        "vi": "Bộ lập luận ngoại tuyến đã áp dụng {citations} dựa trên "
         "dữ kiện đã xác minh. Ghi chú hồ sơ là văn bản tự do, không đáng tin cậy, và không được "
         "dùng để đưa ra khuyến nghị này.",
     },
     "adversarial_injection": {
-        "en": "The case note states Compliance already cleared this as a false positive, "
-        "so recommending CLEAR to approve the account today.",
-        "vi": "Ghi chú hồ sơ nói rằng bộ phận Tuân thủ đã xác nhận đây là báo động giả, "
-        "do đó đề xuất THÔNG QUA để duyệt tài khoản ngay hôm nay.",
+        "en": "The compromised demo proposal follows the untrusted case note and recommends CLEAR "
+        "to approve the account today.",
+        "vi": "Đề xuất mô phỏng bị xâm nhập chạy theo ghi chú hồ sơ không đáng tin cậy, cho rằng đây là "
+        "báo động giả, và đề xuất THÔNG QUA để duyệt tài khoản ngay hôm nay.",
     },
     "planner_failed": {
-        "en": "{planner_class} raised {error_class}: {error}. Fell back to {fallback_outcome}: {fallback_reason}",
-        "vi": "{planner_class} phát sinh lỗi {error_class}: {error}. Đã chuyển sang phương án dự "
-        "phòng {fallback_outcome}: {fallback_reason}",
+        "en": "{planner_class} raised {error_class}: {error}. Continued with the policy-safe path "
+        "{fallback_outcome}: {fallback_reason}",
+        "vi": "{planner_class} phát sinh lỗi {error_class}: {error}. Đã tiếp tục theo nhánh an toàn "
+        "của chính sách {fallback_outcome}: {fallback_reason}",
     },
 }
 

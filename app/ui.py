@@ -17,6 +17,7 @@ if not __package__:
 
 from app import i18n
 from app.agent import KYCExceptionAgent
+from app.domain import PendingTaskKind
 from app.tools import DomainTools
 
 st.set_page_config(page_title="KYC Exception Agent / Tác Tử Xử Lý KYC", layout="wide")
@@ -48,15 +49,15 @@ st.sidebar.info(MLFLOW_STATUS if MLFLOW_ENABLED else f":warning: {MLFLOW_STATUS}
 
 planner_choice = st.sidebar.selectbox(
     i18n.ui_text(lang, "planner_label"),
-    ["auto", "heuristic", "openrouter", "adversarial"],
-    help="auto = OpenRouter if OPENROUTER_API_KEY is set, else the offline heuristic fallback. "
-    "adversarial simulates a compromised model to demonstrate the guardrail override live.",
+    ["normal", "compromised_demo"],
+    format_func=lambda mode: i18n.ui_text(lang, "planner_normal") if mode == "normal" else i18n.ui_text(lang, "planner_compromised"),
+    help=i18n.ui_text(lang, "planner_help"),
 )
 cases = st.session_state.tools.list_cases()
 case_id = st.selectbox(i18n.ui_text(lang, "case_label"), [c["case_id"] for c in cases], format_func=lambda cid: cid)
 
 if st.button(i18n.ui_text(lang, "run"), type="primary"):
-    st.session_state.decision = agent.run(case_id, planner_name=planner_choice, lang=lang)
+    st.session_state.decision = agent.run(case_id, planner_mode=planner_choice, lang=lang)
 
 decision = st.session_state.get("decision")
 if decision is not None and decision.lang != lang:
@@ -72,6 +73,9 @@ if decision is not None:
         st.subheader(decision.outcome_label)
         st.write(decision.summary)
         st.caption(f"{decision.model} · {decision.risk_label}")
+
+        if decision.planner_mode == "compromised_demo":
+            st.warning(i18n.ui_text(lang, "compromised_warning"))
 
         if decision.guardrail_override:
             st.error(f"{i18n.ui_text(lang, 'guardrail_override')}: {decision.guardrail_override}")
@@ -103,7 +107,7 @@ if decision is not None:
             st.write(f"**{c.policy_id} v{c.version}** · {c.section}")
             st.caption(c.excerpt)
 
-        if decision.approval and not decision.executed_action:
+        if decision.pending_task and decision.pending_task.kind is PendingTaskKind.ACTION_APPROVAL:
             detail_bits = []
             if decision.approval.documents_label:
                 detail_bits.append(f"{i18n.ui_text(lang, 'requested_documents')}: {decision.approval.documents_label}")
@@ -112,15 +116,38 @@ if decision is not None:
                 f"(key `{decision.approval.approval_key}`)" + ("\n\n" + "; ".join(detail_bits) if detail_bits else "")
             )
             if st.button(i18n.ui_text(lang, "approve_button")):
-                st.session_state.decision = agent.approve(decision.approval.approval_key, lang=lang)
+                st.session_state.decision = agent.resume(
+                    decision.pending_task.interrupt_key, {"approved": True}, lang=lang
+                )
                 st.rerun()
             rejection_reason = st.text_input(i18n.ui_text(lang, "reject_reason"), key=f"reject-{decision.decision_id}")
             if st.button(i18n.ui_text(lang, "reject_button")):
                 try:
-                    st.session_state.decision = agent.reject(decision.approval.approval_key, rejection_reason, lang=lang)
+                    st.session_state.decision = agent.resume(
+                        decision.pending_task.interrupt_key,
+                        {"approved": False, "reason": rejection_reason},
+                        lang=lang,
+                    )
                     st.rerun()
                 except ValueError as exc:
                     st.error(str(exc))
+        elif decision.pending_task and decision.pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION:
+            st.warning(i18n.ui_text(lang, "pending_document_submission"))
+            st.json(decision.pending_task.payload.get("requested_documents", []))
+            if st.button(i18n.ui_text(lang, "submit_documents")):
+                st.session_state.decision = agent.resume(
+                    decision.pending_task.interrupt_key,
+                    {"documents": [{"type": "proof_of_address", "status": "verified"}]},
+                    lang=lang,
+                )
+                st.rerun()
+        elif decision.pending_task and decision.pending_task.kind is PendingTaskKind.OPERATIONAL_REVIEW:
+            st.warning(i18n.ui_text(lang, "operational_handoff"))
+            if st.button(i18n.ui_text(lang, "acknowledge_handoff")):
+                st.session_state.decision = agent.resume(
+                    decision.pending_task.interrupt_key, {"acknowledged": True}, lang=lang
+                )
+                st.rerun()
         if decision.executed_action:
             st.success(
                 f"{i18n.ui_text(lang, 'action_executed')}: {decision.executed_action['action']} -> "
@@ -131,6 +158,12 @@ if decision is not None:
             st.warning(f"{i18n.ui_text(lang, 'action_rejected')}: {decision.review_result['reason']}")
 
     with right:
+        st.subheader(i18n.ui_text(lang, "workflow_status"))
+        st.caption(f"{decision.workflow_status.value} · {i18n.ui_text(lang, 'current_node')}: {decision.current_node}")
+        st.caption(f"{i18n.ui_text(lang, 'cycle')}: {decision.cycle_count}/{decision.max_cycles}")
+        st.caption(f"{i18n.ui_text(lang, 'planner_attempts')}: {decision.planner_attempts}")
+        usage = decision.planner_usage or {}
+        st.caption(f"{usage.get('total_tokens', 0)} {i18n.ui_text(lang, 'tokens')} · {i18n.ui_text(lang, 'cost')}: {usage.get('cost', i18n.ui_text(lang, 'not_available'))}")
         st.subheader(i18n.ui_text(lang, "agent_trace"))
         for event in decision.trace:
             icon = "\U0001f6a8" if event.status == "override" else "\u26a0\ufe0f" if event.status == "degraded" else "\u2022"
