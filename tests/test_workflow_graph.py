@@ -123,3 +123,12 @@ class WorkflowGraphTests(unittest.TestCase):
         self.assertEqual(exhausted.pending_task.kind, PendingTaskKind.OPERATIONAL_REVIEW)
         self.assertIn("maximum", exhausted.summary)
         self.assertNotIn("missing fields", exhausted.summary)
+
+    def test_invalid_operational_acknowledgement_keeps_interrupt_resumable(self):
+        agent = KYCExceptionAgent()
+        result = agent.run("KYC-1045", planner=BrokenPlanner())
+        key = result.pending_task.interrupt_key
+        with self.assertRaisesRegex(ValueError, "acknowledgement"):
+            agent.resume(key, {"acknowledged": False})
+        done = agent.resume(key, {"acknowledged": True})
+        self.assertEqual(done.workflow_status, WorkflowStatus.COMPLETED)

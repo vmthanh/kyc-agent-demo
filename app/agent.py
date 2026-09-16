@@ -66,6 +66,9 @@ class KYCExceptionAgent:
                     raise ValueError("approval response must include a boolean approved field")
                 if response["approved"] is False and not str(response.get("reason", "")).strip():
                     raise ValueError("rejection reason is required")
+            elif kind == PendingTaskKind.OPERATIONAL_REVIEW.value:
+                if not isinstance(response, dict) or response.get("acknowledged") is not True:
+                    raise ValueError("operational review requires acknowledgement")
             result = pending["graph"].invoke(Command(resume=response), pending["config"])
             self._pending_tasks.pop(interrupt_key, None)
             self._cache_result(pending["decision_id"], pending["case_id"], result, pending["config"], pending["graph"])

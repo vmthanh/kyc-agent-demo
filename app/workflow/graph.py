@@ -1,5 +1,6 @@
 """Compilation of the resumable, policy-first KYC workflow."""
 from dataclasses import dataclass, field
+import time
 from typing import Any
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -68,11 +69,15 @@ def build_workflow_graph(
         def wrapped(state: WorkflowState):
             last: BaseException | None = None
             attempts = max(1, int(policies.tool.max_attempts))
-            for _ in range(attempts):
+            for attempt in range(1, attempts + 1):
                 try:
                     return fn(state)
                 except TransientToolError as exc:
                     last = exc
+                    if attempt < attempts:
+                        delay = min(policies.tool.max_interval, policies.tool.initial_interval * (policies.tool.backoff_factor ** (attempt - 1)))
+                        if delay:
+                            time.sleep(delay)
             update = nodes.tool_error_handler(field)(state, NodeError(last or TransientToolError("unavailable"), name))
             if update.get("trace"):
                 update["trace"][-1]["attempt"] = attempts

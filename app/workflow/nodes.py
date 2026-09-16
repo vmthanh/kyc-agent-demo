@@ -163,9 +163,9 @@ class WorkflowNodes:
             for citation in state.get("citations", [])
         }
         covered = required is not None and required in citation_ids
-        grouped: dict[tuple[str, str], set[str]] = {}
+        grouped: dict[str, set[str]] = {}
         for citation in state.get("citations", []):
-            grouped.setdefault((citation["policy_id"], citation["version"]), set()).add(citation["excerpt"])
+            grouped.setdefault(citation["policy_id"], set()).add(citation["excerpt"])
         contradictory = any(len(excerpts) > 1 for excerpts in grouped.values())
         if not covered or contradictory:
             return {

@@ -34,3 +34,8 @@ policy; exhausted evidence is labeled `cycle_exhausted`; contradictory policy
 citations block planner invocation; and the Streamlit approval panel displays
 the immutable case-bound action payload. Final verification: graph tests 10
 passed; full suite 114 passed.
+
+Final re-review: operational acknowledgements are prevalidated before resume;
+grounding retries honor configured exponential backoff and report final
+attempts; policy contradictions are detected across active versions. Graph
+regressions: 11 passed.
