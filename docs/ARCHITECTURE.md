@@ -68,10 +68,12 @@ the deterministic policy engine recomputes the mandate from typed facts.
 deliberately asks the model to treat the case note as an instruction, so the
 guardrail can be demonstrated against an independent live proposal.
 
-Provider timeout, malformed structured output, missing credentials, and retry
-exhaustion become explicit planner failure state. The safe failure router never
-silently substitutes another runtime planner. Deterministic eval doubles are reserved
-for offline tests and CI.
+Provider timeout, malformed structured output, and retry exhaustion after a
+planner has been constructed become explicit planner failure state. Missing
+credentials are rejected earlier by `select_planner()` and surface as a
+client-visible configuration error; they do not enter the graph. The safe
+failure router never silently substitutes another runtime planner.
+Deterministic eval doubles are reserved for offline tests and CI.
 
 ## Pending tasks and cycle semantics
 

@@ -23,8 +23,9 @@ uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-pro
 uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 ```
 
-Both live planner modes call OpenRouter. If the smoke test fails, keep the
-failure visible and use the strict safe route as part of the interview.
+Both live planner modes call OpenRouter. If a credentialed smoke call fails,
+keep the provider failure visible and use the strict safe route as part of the
+interview. A missing key is a setup/configuration error before the graph runs.
 
 ## 0:00–1:30 — problem and graph
 
@@ -80,9 +81,10 @@ route is correct.” Do not claim an override occurred when it did not.
 ## 11:30–13:00 — retries, strict failure, and tests
 
 Explain that tool and planner retries have bounded budgets. A timeout,
-malformed structured response, missing key, or exhausted retry becomes an
-explicit planner failure and routes to a safe final state. The runtime never
-silently swaps in another runtime planner. Deterministic eval doubles and mocked
+malformed structured response, or exhausted retry after planner construction
+becomes an explicit planner failure and routes to a safe final state. A missing
+key is rejected at planner selection as a visible configuration error. The
+runtime never silently swaps in another runtime planner. Deterministic eval doubles and mocked
 OpenRouter transport keep CI offline, while `evals.openrouter_smoke` is the
 opt-in live check.
 

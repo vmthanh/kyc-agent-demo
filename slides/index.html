@@ -436,7 +436,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </div>
   </div>
   <div class="banner" style="position:absolute;left:48px;right:48px;bottom:104px">
-    OpenRouter proposes <span class="sep">|</span> Guardrail recomputes independently, then routes to request evidence, manual review, compliance stop, or resume cycle
+    OpenRouter proposes <span class="sep">|</span> Guardrail recomputes independently, then routes to request evidence, manual review, compliance stop, or CLEAR; resume cycle follows verified evidence
   </div>
   <div class="tiny" style="position:absolute;left:48px;bottom:66px">
     Graph state stays JSON-safe, so the in-memory checkpointer swaps for Postgres/Redis without a rewrite (app/agent.py).
@@ -577,7 +577,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <thead><tr><th>Layer</th><th>Choice</th><th>Why this one</th></tr></thead>
       <tbody>
         <tr><td>Orchestration</td><td>LangGraph</td><td>Explicit state, conditional branching, checkpointing, native human-in-the-loop interrupts</td></tr>
-        <tr><td>Planner seam</td><td>OpenRouter via langchain-openai</td><td>Normal and compromised_demo both make structured live calls; provider failures route to a strict safe state</td></tr>
+        <tr><td>Planner seam</td><td>OpenRouter via langchain-openai</td><td>Normal and compromised_demo both make structured live calls; provider failures after construction route to a strict safe state</td></tr>
         <tr><td>Safety</td><td>app/policy.py — pure functions</td><td>Independent of the model; the actual safety boundary, unit-testable in isolation</td></tr>
         <tr><td>Domain</td><td>data/ontology.json + typed dataclasses</td><td>Governance beyond a prompt- or RAG-only design: entities, relations, constraints</td></tr>
         <tr><td>Localization</td><td>app/i18n.py templates + best-effort LLM call</td><td>EN/VI renders offline and deterministically; only free-form model prose needs a network call</td></tr>
@@ -646,7 +646,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <p>Stable sha256(case:action) dedup plus locking around check-through-insert; tests assert one ticket per case+action.</p>
       <div class="f">Safe under retry and race</div></div>
     <div class="card"><div class="k">Strict failure</div><h3>Provider errors become safe routes</h3>
-      <p>Missing keys, timeouts and malformed responses become explicit workflow state; eval doubles keep CI deterministic.</p>
+      <p>Missing keys fail at planner selection; timeouts and malformed responses after construction become explicit workflow state. Eval doubles keep CI deterministic.</p>
       <div class="f">No silent runtime planner switch</div></div>
     <div class="card"><div class="k">Bilingual by design</div><h3>EN / VI offline, and re-renderable</h3>
       <p>Deterministic content is templated for both languages; switching language re-renders an existing decision in place.</p>

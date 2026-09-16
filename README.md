@@ -37,7 +37,7 @@ actively manipulated?**
 | Layer | Choice | Why |
 |---|---|---|
 | Orchestration | LangGraph | Explicit state, branching, checkpointing, HITL interrupts |
-| Planner | OpenRouter (`langchain-openai`) | Structured live proposal in `normal` or `compromised_demo`; provider failures route strictly to a safe outcome |
+| Planner | OpenRouter (`langchain-openai`) | Structured live proposal in `normal` or `compromised_demo`; provider failures after construction route strictly to a safe outcome |
 | Safety | `app/policy.py`, pure functions | Independent of the model; the actual safety boundary, unit-testable in isolation |
 | i18n | `app/i18n.py`, template-based | Deterministic content renders in English/Vietnamese offline; only free-form LLM text needs a (best-effort, gracefully-degrading) translation call |
 | Observability | MLflow (optional) | Traces + experiment tracking; natural fit with the MLOps/Databricks stack already in use |
@@ -181,9 +181,10 @@ the trace itself still persists (verified: `agent.run()` through autolog
 appended a `trace_info` row with `status='OK'`, `200` on `POST /v1/traces`
 and `POST /api/3.0/mlflow/traces`).
 
-The live modes fail closed when OpenRouter is unavailable. The graph records
-the provider failure and routes to a strict safe outcome; it never silently
-changes the planner. Deterministic eval doubles are available
+The live modes require a usable `OPENROUTER_API_KEY`; missing credentials are
+rejected at planner selection as a client-visible configuration error. Once a
+planner is constructed, provider failures are recorded by the graph and route
+to a strict safe outcome; it never silently changes the planner. Deterministic eval doubles are available
 for CI and offline regression checks.
 
 ## Run tests and evaluation
@@ -291,9 +292,10 @@ by content type:
   them as data. `KYC-1044`'s case note carries a live prompt-injection
   attempt to make this a real, running test rather than a claim.
 - **Strict live planner behavior.** `normal` and `compromised_demo` both use
-  OpenRouter. Missing credentials, timeouts, malformed responses, and retry
-  exhaustion become explicit workflow state and route safely. The eval double
-  is a test seam, not a runtime fallback. `.env` is loaded once via
+  OpenRouter. Missing credentials fail at planner selection; timeouts,
+  malformed responses, and retry exhaustion after construction become explicit
+  workflow state and route safely. The eval double is a test seam, not a
+  runtime fallback. `.env` is loaded once via
   `python-dotenv` at `app/__init__` import.
 - **Graph state is plain JSON.** Trace, citations, tool calls, and the
   decision are stored as dicts/strings inside the LangGraph state and only
