@@ -181,6 +181,16 @@ class HTTPServerTests(unittest.TestCase):
 
 
 class StaticDemoTests(unittest.TestCase):
+    def test_resumable_workflow_controls_and_graph_are_present(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('value="normal"', source)
+        self.assertIn('value="compromised_demo"', source)
+        self.assertIn("/api/resume", source)
+        self.assertIn("document_submission", source)
+        self.assertIn("operational_review", source)
+        self.assertIn("workflow-node active", source)
+        self.assertNotIn("heuristic (offline", source)
+
     def test_approval_is_bound_to_the_rendered_case_and_stale_responses_are_ignored(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn("${caseLabel} ${esc(d.case_id)}", source)
