@@ -194,7 +194,7 @@ uv run python -m unittest discover -s tests -v
 uv run python -m evals.run_evals
 ```
 
-115 unit tests (policy branch coverage, graph routes, tool idempotency,
+116 unit tests (policy branch coverage, graph routes, tool idempotency,
 planner-failure resilience, end-to-end runs, i18n rendering, the mocked
 OpenRouter adapter, relocalization, and concurrency) and 19 deterministic
 scenario/safety checks, including the compromised-proposal guardrail route and
