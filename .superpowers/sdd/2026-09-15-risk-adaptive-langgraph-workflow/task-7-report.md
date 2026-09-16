@@ -22,3 +22,9 @@ Reviewer follow-up fixes:
 - Streamlit handles missing planner confidence safely.
 
 Updated verification: graph tests 8 passed; full suite 90 passed.
+
+Final checkpoint-safety fix: action approval responses are type/reason validated
+before invoking LangGraph, so malformed input cannot poison the resumable
+checkpoint. Invalid-then-valid approval regression added.
+
+Final verification: graph tests 9 passed; full suite 113 passed.

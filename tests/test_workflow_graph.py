@@ -97,3 +97,12 @@ class WorkflowGraphTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.resume(key, {"approved": "yes"})
         self.assertTrue(agent.has_pending(key))
+
+    def test_invalid_then_valid_action_approval_does_not_poison_checkpoint(self):
+        agent = KYCExceptionAgent()
+        first = agent.run("KYC-1042", planner=HeuristicPlanner())
+        key = first.pending_task.interrupt_key
+        with self.assertRaisesRegex(ValueError, "boolean"):
+            agent.resume(key, {"approved": "yes"})
+        approved = agent.approve(key)
+        self.assertEqual(approved.pending_task.kind, PendingTaskKind.DOCUMENT_SUBMISSION)

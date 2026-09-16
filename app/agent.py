@@ -60,6 +60,12 @@ class KYCExceptionAgent:
             pending = self._pending_tasks.get(interrupt_key)
             if pending is None:
                 raise KeyError("Unknown or already resolved interrupt")
+            kind = (pending.get("value") or {}).get("kind")
+            if kind == PendingTaskKind.ACTION_APPROVAL.value:
+                if not isinstance(response, dict) or not isinstance(response.get("approved"), bool):
+                    raise ValueError("approval response must include a boolean approved field")
+                if response["approved"] is False and not str(response.get("reason", "")).strip():
+                    raise ValueError("rejection reason is required")
             result = pending["graph"].invoke(Command(resume=response), pending["config"])
             self._pending_tasks.pop(interrupt_key, None)
             self._cache_result(pending["decision_id"], pending["case_id"], result, pending["config"], pending["graph"])
