@@ -67,3 +67,8 @@ class WorkflowAPITests(unittest.TestCase):
         handler._json = lambda value, status=200: setattr(handler, "response", (value, status))
         handler.do_POST()
         self.assertEqual(handler.response[1], 400)
+
+    def test_legacy_planner_must_be_a_string(self) -> None:
+        handler = self.make_handler("/api/run", {"case_id": "KYC-1045", "planner": {}})
+        handler.do_POST()
+        self.assertEqual(handler.response[1], 400)

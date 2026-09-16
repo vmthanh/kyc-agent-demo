@@ -61,6 +61,8 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError("planner_mode must be a string")
                     if planner_mode not in {"normal", "compromised_demo"}:
                         raise ValueError(f"Unknown planner mode: {planner_mode}")
+                elif not isinstance(planner_mode, str):
+                    raise ValueError("planner must be a string")
                 lang = payload.get("lang", "en")
                 if not isinstance(lang, str):
                     raise ValueError("lang must be a string")
