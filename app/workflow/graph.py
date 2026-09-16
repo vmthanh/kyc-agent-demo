@@ -71,7 +71,10 @@ def build_workflow_graph(
             attempts = max(1, int(policies.tool.max_attempts))
             for attempt in range(1, attempts + 1):
                 try:
-                    return fn(state)
+                    update = fn(state)
+                    if attempt > 1 and update.get("trace"):
+                        update["trace"][-1]["attempt"] = attempt
+                    return update
                 except TransientToolError as exc:
                     last = exc
                     if attempt < attempts:

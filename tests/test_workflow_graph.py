@@ -41,6 +41,18 @@ class PersistentEvidenceTools(DomainTools):
         return call
 
 
+class RecoveringGroundingTools(DomainTools):
+    def __init__(self):
+        super().__init__()
+        self.attempts = {}
+
+    def call(self, name, purpose, payload):
+        self.attempts[name] = self.attempts.get(name, 0) + 1
+        if name == "get_case" and self.attempts[name] <= 2:
+            raise TransientToolError("temporary")
+        return super().call(name, purpose, payload)
+
+
 class WorkflowGraphTests(unittest.TestCase):
     def test_missing_evidence_resumes_same_run_and_clears_on_cycle_two(self):
         agent = KYCExceptionAgent()
@@ -132,3 +144,9 @@ class WorkflowGraphTests(unittest.TestCase):
             agent.resume(key, {"acknowledged": False})
         done = agent.resume(key, {"acknowledged": True})
         self.assertEqual(done.workflow_status, WorkflowStatus.COMPLETED)
+
+    def test_recovered_grounding_trace_records_retry_attempt(self):
+        tools = RecoveringGroundingTools()
+        result = KYCExceptionAgent(tools=tools).run("KYC-1045", planner=HeuristicPlanner())
+        grounding = [event for event in result.trace if event.step == "load_customer"]
+        self.assertEqual(grounding[0].attempt, 3)
