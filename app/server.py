@@ -1,9 +1,11 @@
-"""Zero-dependency HTTP demo: no extra process, no external services.
+"""Zero-dependency local HTTP demo: one process, no second local service.
 
 This is the recommended surface for a live interview -- it starts in under a
-second and never depends on network access. `app/ui.py` (Streamlit) is the
-optional, richer surface for showing LangGraph's native interrupt/resume UI
-and MLflow tracing side by side with a real OpenRouter model.
+second. Its live `normal` and `compromised_demo` planner modes do require
+network access and an ``OPENROUTER_API_KEY``; deterministic eval doubles keep
+offline tests network-free. `app/ui.py` (Streamlit) is the optional, richer
+surface for showing LangGraph's native interrupt/resume UI and MLflow tracing
+side by side with a real OpenRouter model.
 
 One `KYCExceptionAgent` is shared by every request in this process. Planner
 and language are per-request fields, not separate agent instances, so

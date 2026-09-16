@@ -22,7 +22,8 @@ flowchart TB
   F -->|other planner failure| OPR
   O -->|retry exhausted| F
   O --> Q[reconcile_guard]
-  Q -->|REQUEST_EVIDENCE| D[Request evidence]
+  Q -->|REQUEST_EVIDENCE, cycles remain| D[Request evidence]
+  Q -->|REQUEST_EVIDENCE, max cycles| OPR
   Q -->|MANUAL_REVIEW| M[Manual review]
   Q -->|ESCALATE_COMPLIANCE| C
   Q -->|CLEAR| Z[finalize]
@@ -37,7 +38,6 @@ flowchart TB
   V -->|valid and cycle remains| L[Resume cycle]
   L --> G1
   V -->|invalid| W
-  V -->|cycle limit| B
   OPR --> Z
   C --> B
 ```

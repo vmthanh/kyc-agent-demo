@@ -46,3 +46,8 @@ changed slide markup was reviewed directly.
 - Updated visible verification counts to 112 unit tests and 19 deterministic
   eval checks, and added the KYC-1042 cycle-one/cycle-two story to the full
   deck.
+- Final topology pass: max-cycle `REQUEST_EVIDENCE` now routes to
+  `operational_review`, invalid document submissions loop at
+  `validate_submission`, and sanctions failures terminate at
+  `finalize_blocked`. The HTTP server docstring now distinguishes the single
+  local process from the network/key requirement of live OpenRouter modes.
