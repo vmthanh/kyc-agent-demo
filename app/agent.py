@@ -34,13 +34,23 @@ class KYCExceptionAgent:
             self._graphs[key] = build_workflow_graph(self.tools, resolved)
         return self._graphs[key]
 
-    def run(self, case_id: str, planner_name: str | None = None, planner: Planner | None = None, lang: str = "en") -> AgentDecision:
+    def run(
+        self,
+        case_id: str,
+        planner_name: str | None = None,
+        planner: Planner | None = None,
+        lang: str = "en",
+        planner_mode: str | None = None,
+    ) -> AgentDecision:
         with self._lock:
-            graph = self._graph_for(planner_name, planner)
+            # ``planner_mode`` is the public API name; retain planner_name for
+            # callers of the original façade and for injected planner objects.
+            selected_planner = planner_mode or planner_name
+            graph = self._graph_for(selected_planner, planner)
             decision_id = uuid4().hex
             thread_id = f"{case_id}:{uuid4()}"
             config = {"configurable": {"thread_id": thread_id}}
-            mode = planner_name if planner_name in {"normal", "compromised_demo"} else "normal"
+            mode = selected_planner if selected_planner in {"normal", "compromised_demo"} else "normal"
             result = graph.invoke(initial_state(case_id, thread_id, lang, mode), config)
             self._cache_result(decision_id, case_id, result, config, graph)
             return self._to_decision(case_id, result, config, graph, lang, decision_id)

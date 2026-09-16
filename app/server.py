@@ -52,11 +52,20 @@ class Handler(BaseHTTPRequestHandler):
             size = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(size) or b"{}")
             if self.path == "/api/run":
+                planner_mode = payload.get("planner_mode", payload.get("planner", "normal"))
                 decision = AGENT.run(
                     str(payload["case_id"]),
                     planner_name=payload.get("planner"),
                     lang=str(payload.get("lang", "en")),
+                    planner_mode=planner_mode,
                 )
+                return self._json(decision.to_dict())
+            if self.path == "/api/resume":
+                interrupt_key = str(payload["interrupt_key"])
+                response = payload["response"]
+                if not isinstance(response, dict):
+                    raise ValueError("response must be an object")
+                decision = AGENT.resume(interrupt_key, dict(response), lang=payload.get("lang"))
                 return self._json(decision.to_dict())
             if self.path == "/api/approve":
                 key = str(payload["approval_key"])
@@ -74,7 +83,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(decision.to_dict())
             self.send_error(404)
         except KeyError as exc:
-            self._json({"error": f"Unknown or missing field: {exc}"}, 404)
+            # Missing request fields are client errors; an unknown interrupt
+            # key is also deliberately visible as a 404 for stale UI actions.
+            message = str(exc).strip("'")
+            status = 404 if "interrupt" in message.lower() or "approval" in message.lower() or "unknown" in message.lower() else 400
+            self._json({"error": f"Unknown or missing field: {exc}" if status == 400 else message}, status)
         except ToolError as exc:
             self._json({"error": str(exc)}, 404)
         except ValueError as exc:
