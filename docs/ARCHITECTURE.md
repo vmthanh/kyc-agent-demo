@@ -4,94 +4,124 @@
 
 ```mermaid
 flowchart TB
-  UI[Analyst UI / API] --> O[LangGraph Orchestrator]
-  O --> G[Ground: allowlisted read tools]
-  G --> R[Retrieve: versioned policy]
-  R --> M[Planner: LLM or heuristic fallback]
-  M --> P[Guard: deterministic policy engine]
-  P --> D[Typed Decision + guardrail_override]
-  D --> H{Action required?}
-  H -->|yes| A{Human approval?}
-  A -->|approved| X[Idempotent Action Gateway]
-  A -->|rejected| N[No side effect]
-  H -->|no| N
+  UI[Analyst UI / API] --> I[intake]
+  I --> G1[load_customer]
+  I --> G2[verify_documents]
+  I --> G3[screen_watchlists]
+  I --> G4[load_risk]
+  G1 --> E[Evidence quality gate]
+  G2 --> E
+  G3 --> E
+  G4 --> E
+  E -->|complete| R[retrieve_policy]
+  E -->|missing or tool failure| OPR[operational_review]
+  R --> P[policy_precheck]
+  P -->|policy unavailable| OPR
+  P -->|ready| O[openrouter_reason]
+  F[safe_failure] -->|sanctions policy remains authoritative| B[finalize_blocked]
+  F -->|other planner failure| OPR
+  O -->|retry exhausted| F
+  O --> Q[reconcile_guard]
+  Q -->|REQUEST_EVIDENCE, cycles remain| D[Request evidence]
+  Q -->|REQUEST_EVIDENCE, max cycles| OPR
+  Q -->|MANUAL_REVIEW| M[Manual review]
+  Q -->|ESCALATE_COMPLIANCE| C
+  Q -->|CLEAR| Z[finalize]
+  D --> A[action_review]
+  M --> A
+  A -->|approved| X[execute_action]
+  A -->|rejected| ZR[finalize_rejected]
+  X -->|request_document| W[await_documents]
+  X -->|open_manual_review| Z
+  X -->|gateway failure| OPR[operational_review]
+  W --> V[validate_submission]
+  V -->|valid and cycle remains| L[Resume cycle]
+  L --> G1
+  V -->|invalid| W
+  OPR --> Z
+  C --> B
 ```
+
+Grounding fans out across four allowlisted reads and fans back in at the
+evidence gate. OpenRouter is the only live planner call. The model proposes;
+the deterministic policy engine recomputes the mandate from typed facts.
 
 ## Control-plane principles
 
-- The planner proposes; `policy.py` decides. It recomputes the mandated
-  outcome from typed, tool-sourced facts on every run and overrides the
-  proposal on disagreement -- this is enforced in code (`app/policy.py`,
-  `guard()`), not by prompt instruction.
-- Case notes and any other free text are untrusted. They are fetched through
-  a dedicated `get_case_note` tool, never merged into the facts `policy.py`
-  reads, and explicitly labeled as non-authoritative in the planner prompt.
+- The planner proposes; `app/policy.py` decides. `policy_precheck` runs before
+  the model, and `reconcile_guard` independently checks the structured
+  proposal. A disagreement records `guardrail_override` and keeps the policy
+  result.
+- Case notes and retrieved documents are untrusted text. They travel through
+  dedicated tools and planner context, never into the facts consumed by
+  `policy.py`.
 - Tool results remain typed and attributable to their source (`ToolCall`).
 - Every decision records ontology path, facts, policy versions, tool calls,
-  planner rationale, guardrail verdict, and trace -- an auditable trajectory.
-- Reads and writes are structurally separate: reads happen inline in the
-  graph; writes pause on `interrupt()`, carry the full `action_payload`
-  (not just an action name), and execute through an idempotency-keyed
-  gateway. The approval handle a reviewer clicks (`ApprovalRequest.approval_key`,
-  LangGraph's own interrupt id) is deliberately a *different* value from the
-  action gateway's dedup key (deterministic `sha256(case_id:action)`): the
-  first must be unique per run so two runs of the same case+action never
-  collide; the second must be stable per case+action so approving either
-  run still produces exactly one ticket.
-- One `KYCExceptionAgent` per process, shared across requests. Planner and
-  language are `run()`/`approve()` arguments, not part of construction --
-  an earlier revision built one agent per planner choice, which made
-  approving a pending run ambiguous whenever two requests picked different
-  planners for the same case. See `agent.py`'s class docstring.
+  planner metadata, route, and trace.
+- Reads and writes are structurally separate. A write pauses on LangGraph
+  `interrupt()` with its full `action_payload`; approval resumes the graph.
 
-## Planner seam
+## Planner modes and strict failure
 
-`app/planner.py` defines a `Planner` protocol (`propose(case_id, facts,
-citations, case_note) -> LLMProposal`) with three implementations:
-`OpenRouterPlanner` (real LLM, structured output), `HeuristicPlanner`
-(offline, deterministic fallback), and `AdversarialPlanner` (simulated
-compromised model, used only for red-team demos and the regression eval).
-`select_planner()` auto-detects which to use from environment/CLI flags.
-None of them can bypass `policy.py`; the graph always runs `guard` after
-`reason`.
+`app/planner.py` exposes `normal` and `compromised_demo`. Both instantiate
+`OpenRouterPlanner` and call OpenRouter live. In compromised mode the prompt
+deliberately asks the model to treat the case note as an instruction, so the
+guardrail can be demonstrated against an independent live proposal.
 
-## Presentation-layer i18n
+Provider timeout, malformed structured output, and retry exhaustion after a
+planner has been constructed become explicit planner failure state. Missing
+credentials are rejected earlier by `select_planner()` and surface as a
+client-visible configuration error; they do not enter the graph. The safe
+failure router never silently substitutes another runtime planner.
+Deterministic eval doubles are reserved for offline tests and CI.
 
-`app/i18n.py` is the only module allowed to know about display language.
-Graph nodes and `policy.py`/`planner.py` produce stable English keys and
-parameters (`PolicyVerdict.reason_key`, `LLMProposal.rationale_key`); all
-language rendering happens once, at `agent.py:_to_decision`. Deterministic
-content (verdict reasons, overrides, heuristic/adversarial rationale,
-citations, UI chrome) renders offline for English and Vietnamese. A real
-LLM's free-form rationale gets one best-effort translation call
-(`i18n.translate_via_llm`) that returns `None` on any failure so the caller
-can fall back to the English original instead of crashing or silently
-showing a broken translation.
+## Pending tasks and cycle semantics
 
-## Failure taxonomy
+The graph exposes three pending-task kinds:
 
-| Layer | Example | Detection | Response |
-|---|---|---|---|
-| Data | stale customer profile | freshness metadata | retry or abstain |
-| Retrieval | irrelevant policy | labeled citation eval | hybrid rerank / filter |
-| Planning | wrong tool sequence, hallucinated outcome | trajectory eval, guardrail override log | prompt/model regression, review override rate |
-| Injection | case note instructs the model | adversarial planner eval (`evals/run_evals.py`) | guardrail override (already enforced) |
-| Tool | timeout or bad schema | contract validation | retry with budget |
-| Policy | missing jurisdiction | rule coverage test | block resolution |
-| Action | duplicate ticket | idempotency check on `execute_approved_action` | return prior result |
+- `ACTION_APPROVAL`: approval is required for `request_document` or
+  `open_manual_review`; the payload names the exact documents or evidence.
+- `DOCUMENT_SUBMISSION`: after an approved evidence request, the reviewer
+  submits verified documents through the resume endpoint.
+- `OPERATIONAL_REVIEW`: an action or infrastructure problem needs a human
+  handoff before finalization.
+
+`cycle_count` starts at one. A valid document submission routes to
+`increment_cycle`, then repeats grounding, retrieval, precheck, OpenRouter,
+and guard. `max_cycles` defaults to two. Invalid evidence loops back to
+`await_documents` for another submission. If `REQUEST_EVIDENCE` reaches the
+cycle limit, the graph pauses at `operational_review`; acknowledgement then
+continues to `finalize`/`COMPLETED`. A sanctions stop routes to
+`finalize_blocked` with no approval token.
+
+## Payload-aware idempotency
+
+The reviewer’s interrupt ID is unique to a run. The action gateway's stable
+idempotency key hashes the canonical case, action, and normalized payload. This
+keeps two approval handles independent while ensuring retries or duplicate
+approvals for the same requested document/evidence bundle return one ticket.
+The demo protects the check-through-insert with an in-process lock; production
+must enforce the same key with a durable unique constraint or compare-and-swap.
+
+## Repository map
+
+```text
+app/workflow/  state schema, fan-out/fan-in graph, nodes, and route functions
+app/planner.py OpenRouter adapter and normal/compromised_demo prompt modes
+app/policy.py  pure deterministic policy precheck and guardrail
+app/tools.py   allowlisted reads, policy retrieval, and idempotent gateway
+app/agent.py   public run/resume/approve/reject façade
+app/server.py  HTTP API: /api/run, /api/resume, /api/approve, /api/reject
+app/cli.py     terminal demo and resume commands
+evals/         deterministic eval doubles plus optional OpenRouter smoke test
+```
 
 ## Threat model excerpt
 
-- untrusted text in case notes or retrieved documents -- mitigated by
-  routing case notes through a separate tool and never feeding them to
-  `policy.py`; demonstrated live with `KYC-1044` and the adversarial planner;
-- cross-tenant data leakage -- mitigate with tenant-scoped retrieval and
-  per-tool identity in production (not modeled in this single-tenant demo);
-- over-privileged tool credentials -- `DomainTools.call` allowlists tool
-  names; `execute_approved_action` allowlists actions separately;
-- policy version drift -- citations carry `policy_id` + `version`; replay a
-  golden case suite before activating a new policy version;
-- model or prompt changes that alter trajectories -- pin planner/model
-  version in the trace, replay `evals/run_evals.py` on every change;
-- duplicate side effects after retries -- `execute_approved_action` is
-  idempotency-keyed and safe to call more than once.
+- Untrusted case notes cannot change policy evaluation. KYC-1044 proves the
+  guardrail still emits `ESCALATE_COMPLIANCE` when a compromised proposal says
+  `CLEAR`.
+- Tool names are allowlisted and action payloads are built outside the model.
+- Policy citations include `policy_id` and `version` for replay and audit.
+- Planner/model changes replay the deterministic scenario suite before release.
+- Duplicate side effects are prevented by payload-aware idempotency.

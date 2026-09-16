@@ -181,6 +181,19 @@ class HTTPServerTests(unittest.TestCase):
 
 
 class StaticDemoTests(unittest.TestCase):
+    def test_resumable_workflow_controls_and_graph_are_present(self) -> None:
+        source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('value="normal"', source)
+        self.assertIn('value="compromised_demo"', source)
+        self.assertIn("/api/resume", source)
+        self.assertIn("document_submission", source)
+        self.assertIn("operational_review", source)
+        self.assertIn("workflow-node active", source)
+        self.assertIn("d.guardrail_override", source)
+        self.assertIn("text('override')", source)
+        self.assertIn("d.proposal_confidence != null", source)
+        self.assertNotIn("heuristic (offline", source)
+
     def test_approval_is_bound_to_the_rendered_case_and_stale_responses_are_ignored(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn("${caseLabel} ${esc(d.case_id)}", source)
@@ -235,12 +248,12 @@ class AgentEndToEndTests(unittest.TestCase):
         self.assertIsNone(result.approval)
         self.assertIsNone(result.executed_action)
 
-    def test_approving_twice_never_creates_a_second_ticket(self) -> None:
+    def test_resolved_interrupt_cannot_be_approved_twice(self) -> None:
         result = self.run_heuristic("KYC-1042")
         key = result.approval.approval_key
-        first = self.agent.approve(key).executed_action
-        second = self.agent.approve(key).executed_action
-        self.assertEqual(first["ticket_id"], second["ticket_id"])
+        self.agent.approve(key)
+        with self.assertRaisesRegex(KeyError, "resolved"):
+            self.agent.approve(key)
 
     def test_rejecting_an_action_records_the_reason_without_a_side_effect(self) -> None:
         result = self.run_heuristic("KYC-1042")
@@ -296,19 +309,23 @@ class AgentEndToEndTests(unittest.TestCase):
         self.assertIsNotNone(result.guardrail_override)
         self.assertEqual(result.outcome, Outcome.ESCALATE_COMPLIANCE)
 
-    def test_planner_runtime_failure_falls_back_without_crashing(self) -> None:
-        """A network blip or a bad API key must degrade gracefully, not crash
-        a live run: `agent.py`'s reason node catches planner exceptions."""
+    def test_planner_runtime_failure_is_strictly_degraded(self) -> None:
+        """Provider failure retries three times and never silently falls back."""
 
         class BrokenPlanner:
             name = "broken"
+            calls = 0
 
             def propose(self, *args):
-                raise RuntimeError("simulated network failure")
+                self.calls += 1
+                from app.planner import PlannerUnavailableError
+                raise PlannerUnavailableError("simulated network failure")
 
-        result = self.agent.run("KYC-1042", planner=BrokenPlanner())
-        self.assertEqual(result.outcome, Outcome.REQUEST_EVIDENCE)
-        self.assertTrue(any(e.status == "degraded" for e in result.trace))
+        planner = BrokenPlanner()
+        result = self.agent.run("KYC-1042", planner=planner)
+        self.assertEqual(planner.calls, 3)
+        self.assertEqual(result.outcome, Outcome.MANUAL_REVIEW)
+        self.assertEqual(result.workflow_status.value, "AWAITING_OPERATIONS")
 
     def test_vietnamese_rendering_is_offline_and_stable(self) -> None:
         """Templated content (summary, override, heuristic rationale, policy
@@ -364,12 +381,12 @@ class AgentEndToEndTests(unittest.TestCase):
         self.assertEqual(outcomes["KYC-1044"], Outcome.ESCALATE_COMPLIANCE)
         self.assertEqual(outcomes["KYC-1045"], Outcome.CLEAR)
 
-    def test_concurrent_approve_calls_on_the_same_key_produce_one_ticket(self) -> None:
+    def test_replaying_an_resolved_interrupt_is_rejected(self) -> None:
         result = self.run_heuristic("KYC-1042")
         key = result.approval.approval_key
-        results = run_concurrently(lambda i: self.agent.approve(key).executed_action["ticket_id"], 10)
-        self.assertEqual(len(results), 10)
-        self.assertEqual(len(set(results)), 1)
+        self.agent.approve(key)
+        with self.assertRaisesRegex(KeyError, "resolved"):
+            self.agent.resume(key, {"approved": True})
 
 
 class OpenRouterPlannerTests(unittest.TestCase):
@@ -390,13 +407,14 @@ class OpenRouterPlannerTests(unittest.TestCase):
                 # The case note must be present but explicitly marked untrusted.
                 user_message = messages[1][1]
                 assert "untrusted" in user_message
-                return FakeStructuredResponse()
+                return {"parsed": FakeStructuredResponse(), "raw": None, "parsing_error": None}
 
         class FakeChatOpenAI:
             def __init__(self, **kwargs):
                 pass
 
-            def with_structured_output(self, schema):
+            def with_structured_output(self, schema, include_raw=False):
+                assert include_raw
                 return FakeStructuredClient()
 
         with patch("app.planner.os.environ", {"OPENROUTER_API_KEY": "test-key"}), \

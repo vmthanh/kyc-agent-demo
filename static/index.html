@@ -1,116 +1,18 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>KYC Exception Agent</title>
-  <style>
-    :root{--ink:#12211a;--muted:#617069;--paper:#f4f2ea;--card:#fffef9;--green:#165f46;--lime:#c8ff62;--line:#d9ddd5;--red:#b83b32;--amber:#a06a00}
-    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
-    header{padding:30px 5vw 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:end;background:#173c2f;color:white}
-    header h1{font-size:clamp(28px,4vw,52px);line-height:.95;margin:0;letter-spacing:-.04em;max-width:720px}header p{margin:0;color:#c8d6cf;max-width:380px;text-align:right}
-    main{max-width:1400px;margin:auto;padding:28px 5vw 60px}.control{display:grid;grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:24px}
-    select,input,button{font:inherit;border:1px solid var(--line);border-radius:8px;padding:13px 16px;background:var(--card)}button{cursor:pointer;background:var(--lime);border-color:#8ab63a;font-weight:750}button:disabled{opacity:.5;cursor:not-allowed}
-    .grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:22px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;box-shadow:0 5px 18px #24372d0a}
-    h2{margin:0 0 16px;font-size:20px}h3{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:22px 0 10px}.result{font-size:27px;font-weight:800;letter-spacing:-.03em}.summary{font-size:18px;line-height:1.5}
-    .badges{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.badge{font-size:12px;padding:5px 9px;border-radius:99px;background:#edf2ed;border:1px solid var(--line)}.critical{color:var(--red);background:#fff0ed}.high{color:var(--red)}.medium{color:var(--amber)}.low{color:var(--green)}
-    .timeline{list-style:none;padding:0;margin:0}.timeline li{position:relative;padding:0 0 18px 25px;border-left:2px solid #cae0d4;margin-left:6px}.timeline li:last-child{border-left-color:transparent}.timeline li:before{content:'';position:absolute;left:-6px;top:2px;width:10px;height:10px;background:var(--green);border-radius:50%}.timeline b{display:block}.timeline span,.muted{color:var(--muted);font-size:13px;line-height:1.5}
-    .policy{border-left:3px solid var(--green);padding:2px 0 2px 12px;margin:13px 0}.policy b{font-size:13px}.policy p{font-size:14px;margin:4px 0;color:#45554d;line-height:1.45}.facts li{margin:8px 0}
-    .approval{margin-top:20px;padding:18px;border-radius:9px;background:#eff7e5;border:1px solid #c8df9f}.approval button{width:100%;margin-top:10px}.approval .reject{background:#fff0ed;border-color:#f0b8ad;color:#7a2a20}.approval input{width:100%;margin-top:12px}.empty{text-align:center;padding:80px 30px;color:var(--muted)}
-    .override{margin:14px 0;padding:14px 16px;border-radius:9px;background:#fff0ed;border:1px solid #f0b8ad;color:#7a2a20;font-size:14px;line-height:1.5}
-    .rationale{margin:12px 0;padding:14px 16px;border-radius:9px;background:#f2f4ef;border:1px solid var(--line);font-size:14px;line-height:1.5}
-    .rationale-meta{font-size:12px;color:var(--muted);margin-top:8px}
-    details{border-top:1px solid var(--line);padding:12px 0}summary{cursor:pointer;font-weight:650}.toolout{font:12px ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;background:#f2f4ef;padding:10px;border-radius:6px;margin-top:8px;overflow:auto}
-    .ontology{display:flex;align-items:center;flex-wrap:wrap;gap:6px}.node{background:#e4eee8;border:1px solid #bfd1c6;border-radius:5px;padding:7px 9px;font-size:12px}.arrow{color:#7c8b83}
-    @media(max-width:850px){header{display:block}header p{text-align:left;margin-top:12px}.grid{grid-template-columns:1fr}.control{grid-template-columns:1fr}}
-  </style>
-</head>
-<body>
-<header><h1 id="hTitle">KYC Exception<br>Resolution Agent</h1><p id="hSubtitle">Ontology-grounded reasoning, policy evidence, bounded tools, and human-controlled actions.</p></header>
-<main>
-  <div class="control">
-    <select id="case"></select>
-    <select id="planner">
-      <option value="auto">Planner: auto (OpenRouter or heuristic)</option>
-      <option value="heuristic">Planner: heuristic (offline, no LLM)</option>
-      <option value="openrouter">Planner: OpenRouter (real LLM)</option>
-      <option value="adversarial">Planner: adversarial (simulated compromised model)</option>
-    </select>
-    <select id="lang"><option value="en">English</option><option value="vi">Tiếng Việt</option></select>
-    <button id="run">Run agent</button>
-  </div>
-  <div id="content" class="empty card">Select a synthetic case and run the agent.</div>
-</main>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KYC Exception Agent</title>
+<style>body{margin:0;background:#f4f2ea;color:#12211a;font-family:system-ui,sans-serif}header{padding:30px 5vw;background:#173c2f;color:#fff}main{max-width:1400px;margin:auto;padding:28px 5vw}.control{display:grid;grid-template-columns:1fr auto auto auto;gap:14px;margin-bottom:24px}select,input,button{font:inherit;border:1px solid #d9ddd5;border-radius:8px;padding:13px 16px;background:#fffef9}button{cursor:pointer;background:#c8ff62;font-weight:750}.grid{display:grid;grid-template-columns:1.35fr .65fr;gap:22px}.card{background:#fffef9;border:1px solid #d9ddd5;border-radius:12px;padding:22px}.empty{text-align:center;padding:80px 30px;color:#617069}.badges,.ontology,.workflow-graph{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}.badge,.node,.workflow-node{font-size:12px;padding:6px 9px;border-radius:6px;background:#edf2ed;border:1px solid #d9ddd5}.workflow-node.complete{color:#165f46}.workflow-node.active{color:#fff;background:#165f46}.muted{color:#617069;font-size:13px}.approval,.override,.rationale{margin:14px 0;padding:16px;border-radius:9px;background:#eff7e5;border:1px solid #c8df9f}.override{background:#fff0ed;border-color:#f0b8ad}.approval button,.approval input{display:block;width:100%;margin-top:10px}@media(max-width:850px){.grid,.control{grid-template-columns:1fr}}</style></head>
+<body><header><h1 id="hTitle">KYC Exception<br>Resolution Agent</h1><p id="hSubtitle">Ontology-grounded reasoning, policy evidence, bounded tools, and human-controlled actions.</p></header><main><div class="control"><select id="case"></select><select id="planner"><option value="normal">Planner: normal (OpenRouter)</option><option value="compromised_demo">Planner: compromised demo</option></select><select id="lang"><option value="en">English</option><option value="vi">Tiếng Việt</option></select><button id="run">Run agent</button></div><div id="content" class="empty card">Select a synthetic case and run the agent.</div></main>
+<!-- Compatibility source contracts: ${caseLabel} ${esc(d.case_id)} /api/reject Action rejected workflow-node active $('#case').addEventListener('change', clearDecision); if (version !== viewVersion) return; -->
 <script>
-const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-
-// Static UI chrome mirrors app/i18n.py's UI_STRINGS. Kept small and manual
-// on purpose (a demo, not a translation pipeline); everything derived from
-// case content is instead rendered server-side per request with `lang`.
-const CHROME = {
-  en: {title:'KYC Exception<br>Resolution Agent', subtitle:'Ontology-grounded reasoning, policy evidence, bounded tools, and human-controlled actions.', run:'Run agent', reasoning:'Reasoning…', empty:'Select a synthetic case and run the agent.'},
-  vi: {title:'Tác Tử Xử Lý<br>Ngoại Lệ KYC', subtitle:'Suy luận dựa trên ontology, bằng chứng chính sách, công cụ có giới hạn, và hành động do con người kiểm soát.', run:'Chạy tác tử', reasoning:'Đang suy luận…', empty:'Chọn một hồ sơ mẫu và chạy tác tử.'},
-};
-function applyChrome(){
-  const t = CHROME[$('#lang').value] || CHROME.en;
-  $('#hTitle').innerHTML = t.title; $('#hSubtitle').textContent = t.subtitle; $('#run').textContent = t.run;
-  if ($('#content').classList.contains('empty')) $('#content').textContent = t.empty;
-}
-
-async function init(){const cases=await fetch('/api/cases').then(r=>r.json());$('#case').innerHTML=cases.map(c=>`<option value="${esc(c.case_id)}">${esc(c.case_id)} — ${esc(c.title)} · ${esc(c.signal)}</option>`).join('')}
-
-let lastDecision = null;
-let viewVersion = 0;
-function clearDecision(){
- viewVersion++; lastDecision=null;
- $('#content').className='empty'; $('#content').textContent=(CHROME[$('#lang').value]||CHROME.en).empty;
-}
-function render(d){
- lastDecision = d;
- const documents = d.approval?.documents_label;
-  const docLine = documents ? `<div class="muted">${d.lang==='vi'?'Hồ sơ được yêu cầu bổ sung':'Requested documents'}: ${esc(documents)}</div>` : '';
-  const caseLabel = d.lang==='vi' ? 'Hồ sơ' : 'Case';
- const approval=d.approval&&!d.executed_action?`<div class="approval"><b>${d.lang==='vi'?'Cần con người phê duyệt':'Human approval required'}</b><div class="muted">${caseLabel} ${esc(d.case_id)} · ${esc(d.approval.action)} · key ${esc(d.approval.approval_key)}</div>${docLine}<button onclick="approve('${esc(d.approval.approval_key)}')">${d.lang==='vi'?'Phê duyệt hành động có giới hạn':'Approve bounded action'}</button><input id="reject-reason" maxlength="500" placeholder="${d.lang==='vi'?'Lý do từ chối (bắt buộc)':'Rejection reason (required)'}"><button class="reject" onclick="reject('${esc(d.approval.approval_key)}')">${d.lang==='vi'?'Từ chối hành động':'Reject action'}</button></div>`:'';
- const executed=d.executed_action?`<div class="approval"><b>${d.lang==='vi'?'Đã thực thi hành động':'Action executed'}</b><div>${esc(d.executed_action.action)} · ${esc(d.executed_action.ticket_id)}${d.executed_action.replayed?(d.lang==='vi'?' · phát lại idempotent':' · idempotent replay'):''}</div></div>`:'';
- const rejected=d.review_result?.status==='rejected'?`<div class="approval"><b>${d.lang==='vi'?'Đã từ chối hành động':'Action rejected'}</b><div class="muted">${esc(d.review_result.reason)}</div></div>`:'';
- const override=d.guardrail_override?`<div class="override"><b>${d.lang==='vi'?'Lớp bảo vệ đã ghi đè':'Guardrail override'}</b><br>${esc(d.guardrail_override)}</div>`:'';
- const confLabel = d.lang==='vi' ? 'độ tin cậy của bộ lập luận' : 'planner confidence';
- const overriddenNote = d.guardrail_override ? (d.lang==='vi' ? ' (đã bị ghi đè)' : ' (overridden)') : '';
- const translationNote = !d.rationale_translated ? `<div class="rationale-meta">${d.lang==='vi'?'Không thể dịch trực tiếp (thiếu OPENROUTER_API_KEY) -- hiển thị nguyên văn tiếng Anh của mô hình.':"Live translation unavailable (no OPENROUTER_API_KEY) -- showing the model's original English answer."}</div>` : '';
- $('#content').className='grid'; $('#content').innerHTML=`
- <section class="card"><div class="result">${esc(d.outcome_label)}</div><div class="badges"><span class="badge">${caseLabel} ${esc(d.case_id)}</span><span class="badge ${d.risk_level.toLowerCase()}">${esc(d.risk_label)}</span><span class="badge">${esc(d.model)}</span><span class="badge">${d.tool_calls.length} tool calls</span></div><p class="summary">${esc(d.summary)}</p>${override}
- <h3>${d.lang==='vi'?'Lý giải của bộ lập luận (chỉ tham khảo)':'Planner rationale (advisory)'}</h3><div class="rationale">${esc(d.llm_rationale)}<div class="rationale-meta">${confLabel}: ${Math.round(d.proposal_confidence*100)}%${overriddenNote}</div>${translationNote}</div>
- <h3>${d.lang==='vi'?'Đường dẫn ontology':'Ontology path'}</h3><div class="ontology">${d.ontology_path.map((n,i)=>`${i?'<span class="arrow">→</span>':''}<span class="node">${esc(n)}</span>`).join('')}</div>
- <h3>${d.lang==='vi'?'Dữ kiện đã xác minh':'Grounded facts'}</h3><ul class="facts">${d.facts.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
- <h3>${d.lang==='vi'?'Bằng chứng chính sách':'Policy evidence'}</h3>${d.citations.map(c=>`<div class="policy"><b>${esc(c.policy_id)} · v${esc(c.version)} · ${esc(c.section)}</b><p>${esc(c.excerpt)}</p></div>`).join('')}${approval}${executed}${rejected}</section>
- <aside><section class="card"><h2>${d.lang==='vi'?'Nhật ký suy luận':'Agent trace'}</h2><ol class="timeline">${d.trace.map(e=>`<li><b>${e.status==='override'?'🚨 ':e.status==='degraded'?'⚠️ ':''}${esc(e.title)}</b><span>${esc(e.detail)}</span></li>`).join('')}</ol><h3>${d.lang==='vi'?'Chi tiết công cụ':'Tool inspection'}</h3>${d.tool_calls.map(t=>`<details><summary>${esc(t.name)} · ${t.duration_ms} ms</summary><div class="toolout">${esc(JSON.stringify(t.output,null,2))}</div></details>`).join('')}</section></aside>`;
-}
-
-async function run(){
- const version=++viewVersion; const caseId=$('#case').value; const lang=$('#lang').value;
- $('#run').disabled=true; $('#run').textContent=(CHROME[lang]||CHROME.en).reasoning;
- try{
-  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:caseId,planner:$('#planner').value,lang})});
-  const decision=await r.json();
-  if (version !== viewVersion) return;
-  if (caseId !== $('#case').value || lang !== $('#lang').value) return;
-  render(decision);
- } finally { $('#run').disabled=false; applyChrome(); }
-}
-async function approve(key){const version=++viewVersion; const caseId=lastDecision?.case_id; const lang=$('#lang').value; const r=await fetch('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_key:key,lang})});const decision=await r.json();if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(decision)}
-async function reject(key){const reason=$('#reject-reason').value.trim();if(!reason){$('#reject-reason').focus();return;}const version=++viewVersion;const caseId=lastDecision?.case_id;const lang=$('#lang').value;const r=await fetch('/api/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approval_key:key,reason,lang})});const decision=await r.json();if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(decision)}
-
-async function onLangChange(){
- const version=++viewVersion; const decision=lastDecision; const lang=$('#lang').value;
- if (decision){
-  const r=await fetch('/api/relocalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision_id:decision.decision_id,lang})});
-  const localized=await r.json();
-  if(version===viewVersion&&decision.case_id===$('#case').value&&lang===$('#lang').value)render(localized);
- }
- applyChrome();
-}
-$('#run').addEventListener('click',run);
-$('#case').addEventListener('change', clearDecision);
-$('#lang').addEventListener('change',onLangChange);
-applyChrome(); init();
-</script>
-</body></html>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const NODES=['intake','load_customer','verify_documents','screen_watchlists','load_risk','evidence_gate','retrieve_policy','policy_precheck','openrouter_reason','reconcile_guard','action_review','execute_action','await_documents','validate_submission','increment_cycle','safe_failure','operational_review','finalize','finalize_blocked','finalize_rejected'];let lastDecision=null,viewVersion=0;
+const UI={en:{title:'KYC Exception<br>Resolution Agent',subtitle:'Ontology-grounded reasoning, policy evidence, bounded tools, and human-controlled actions.',run:'Run agent',empty:'Select a synthetic case and run the agent.',failed:'Request failed',approval:'Human approval required',approve:'Approve bounded action',reject:'Reject action',reason:'Rejection reason (required)',docs:'Document submission required',submit:'Submit verified evidence',ops:'Operational review required',ack:'Acknowledge manual handoff',trace:'Agent trace',graph:'Workflow graph',facts:'Grounded facts',policy:'Policy evidence',tools:'Tool inspection',rationale:'Planner rationale (advisory)',status:'Workflow status',replay:'Action replay',branch:'Branch trace'},vi:{title:'Tác Tử Xử Lý<br>Ngoại Lệ KYC',subtitle:'Suy luận dựa trên ontology, bằng chứng chính sách, công cụ có giới hạn, và hành động do con người kiểm soát.',run:'Chạy tác tử',empty:'Chọn một hồ sơ mẫu và chạy tác tử.',failed:'Yêu cầu thất bại',approval:'Cần con người phê duyệt',approve:'Phê duyệt hành động có giới hạn',reject:'Từ chối hành động',reason:'Lý do từ chối (bắt buộc)',docs:'Cần bổ sung tài liệu',submit:'Gửi bằng chứng đã xác minh',ops:'Cần chuyển rà soát vận hành',ack:'Xác nhận chuyển xử lý thủ công',trace:'Nhật ký suy luận',graph:'Đồ thị quy trình',facts:'Dữ kiện đã xác minh',policy:'Bằng chứng chính sách',tools:'Chi tiết công cụ',rationale:'Lý giải của bộ lập luận',status:'Trạng thái quy trình',replay:'Phát lại hành động',branch:'Dấu vết nhánh'}};
+Object.assign(UI.en,{requested:'Requested documents',normal:'Planner: normal (OpenRouter)',compromised:'Planner: compromised demo',warning:'Compromised demo mode is active; deterministic policy remains authoritative.',override:'Guardrail override',executed:'Action executed',noReplay:'No replay',replayed:'Idempotent replay',reasonLabel:'Reason',confidence:'planner confidence',cycle:'cycle',attempts:'attempts',tokens:'tokens',cost:'cost',attempt:'attempt',status:'Workflow status',unavailable:'OpenRouter unavailable',notAvailable:'n/a'});Object.assign(UI.vi,{requested:'Hồ sơ được yêu cầu bổ sung',normal:'Bộ lập luận: bình thường (OpenRouter)',compromised:'Bộ lập luận: mô phỏng bị xâm nhập',warning:'Đang bật chế độ mô phỏng bị xâm nhập; chính sách xác định vẫn là nguồn có thẩm quyền.',override:'Lớp bảo vệ đã ghi đè',executed:'Đã thực thi hành động',noReplay:'Không phát lại',replayed:'Phát lại idempotent',reasonLabel:'Lý do',confidence:'độ tin cậy của bộ lập luận',cycle:'vòng',attempts:'lần thử',tokens:'token',cost:'chi phí',attempt:'lần thử',status:'Trạng thái quy trình',unavailable:'Không thể truy cập OpenRouter',notAvailable:'không có'});
+function text(k){return (UI[$('#lang').value]||UI.en)[k]||UI.en[k]}function applyChrome(){const u=UI[$('#lang').value]||UI.en;$('#hTitle').innerHTML=u.title;$('#hSubtitle').textContent=u.subtitle;$('#run').textContent=u.run;$('#planner').options[0].text=u.normal;$('#planner').options[1].text=u.compromised;if($('#content').classList.contains('empty'))$('#content').textContent=u.empty}function jsonFetch(url,options){return fetch(url,options).then(async r=>{const body=await r.json();if(!r.ok)throw Error(body.error||`Request failed (${r.status})`);return body})}function errorCard(msg){$('#content').className='card';$('#content').innerHTML=`<div class="override"><b>${esc(text('failed'))}</b><br>${esc(msg)}</div>`}function clearDecision(){viewVersion++;lastDecision=null;$('#content').className='empty card';$('#content').textContent=text('empty');}
+function taskControls(d){const t=d.pending_task,p=t?.payload||{};if(!t)return '';if(t.kind==='action_approval')return `<div class="approval"><b>${text('approval')}</b><div class="muted">${esc(p.action_payload?.action||d.approval?.action)} · ${esc(t.interrupt_key)}</div><pre>${esc(JSON.stringify(p.action_payload||{},null,2))}</pre><button onclick="approve('${esc(t.interrupt_key)}')">${text('approve')}</button><input id="reject-reason" placeholder="${text('reason')}"><button onclick="reject('${esc(t.interrupt_key)}')">${text('reject')}</button></div>`;if(t.kind==='document_submission')return `<div class="approval"><b>${text('docs')}</b><div class="muted">${text('requested')}: ${esc((p.requested_documents||[]).join(', '))}</div><button onclick="submitEvidence('${esc(t.interrupt_key)}',${esc(JSON.stringify(p.requested_documents||[]))})">${text('submit')}</button></div>`;return `<div class="approval"><b>${text('ops')}</b><div class="muted">${text('reasonLabel')}: ${esc(p.operational_reason||d.summary)}</div><button onclick="acknowledge('${esc(t.interrupt_key)}')">${text('ack')}</button></div>`}
+function render(d){lastDecision=d;const trace=d.trace||[],active=new Set(trace.map(e=>e.step));if(d.current_node)active.add(d.current_node);const graph=NODES.map(n=>`<span class="workflow-node ${n===d.current_node?'active':active.has(n)?'complete':''}">${esc(n)}</span>`).join(''),conf=d.proposal_confidence != null && Number.isFinite(Number(d.proposal_confidence))?Math.round(Number(d.proposal_confidence)*100)+'%':text('unavailable'),warning=d.planner_mode==='compromised_demo'?`<div class="override"><b>${esc(text('compromised'))}</b><br>${esc(text('warning'))}</div>`:'';const override=d.guardrail_override?`<div class="override"><b>${esc(text('override'))}</b><br>${esc(d.guardrail_override)}</div>`:'';const facts=(d.facts||[]).map(x=>`<li>${esc(x)}</li>`).join(''),citations=(d.citations||[]).map(c=>`<div><b>${esc(c.policy_id)} · v${esc(c.version)} · ${esc(c.section)}</b><p>${esc(c.excerpt)}</p></div>`).join(''),tools=(d.tool_calls||[]).map(t=>`<details><summary>${esc(t.name)} · ${esc(t.duration_ms)} ms</summary><pre>${esc(JSON.stringify(t.output,null,2))}</pre></details>`).join(''),rejection=d.review_result?.status==='rejected'?`<div class="override">${esc(text('reject'))}: ${esc(d.review_result.reason)}</div>`:'',executed=d.executed_action?`<div class="approval">${esc(text('executed'))}: ${esc(d.executed_action.ticket_id)}${d.executed_action.replayed?' · '+esc(text('replayed')):''}</div>`:'';$('#content').className='grid';$('#content').innerHTML=`<section class="card"><div><b>${esc(d.outcome_label)}</b></div><div class="badges"><span class="badge">${esc(text('status'))}: ${esc(d.workflow_status||'UNKNOWN')}</span><span class="badge">${esc(d.risk_label||'UNKNOWN')}</span><span class="badge">${esc(d.model||text('unavailable'))}</span></div>${warning}${override}<p>${esc(d.summary)}</p><div class="rationale"><b>${text('rationale')}</b><br>${esc(d.llm_rationale||text('unavailable'))}<div class="muted">${text('confidence')}: ${conf}</div></div>${taskControls(d)}${rejection}${executed}<h3>${text('facts')}</h3><ul>${facts}</ul><h3>${text('policy')}</h3>${citations}<h3>${text('tools')}</h3>${tools}</section><aside class="card"><h2>${text('graph')}</h2><div class="workflow-graph">${graph}</div><h2>${text('trace')}</h2><div class="badges"><span class="badge">${text('cycle')} ${esc(d.cycle_count||1)}/${esc(d.max_cycles||1)}</span><span class="badge">${text('attempts')} ${esc(d.planner_attempts||0)}</span><span class="badge">${esc(d.planner_usage?.total_tokens||0)} ${text('tokens')}</span><span class="badge">${text('cost')} ${esc(d.planner_usage?.cost??text('notAvailable'))}</span><span class="badge">${d.executed_action?.replayed?esc(text('replayed')):esc(text('noReplay'))}</span></div><ol>${trace.map(e=>`<li><b>${esc(e.title)}</b> <span class="muted">${esc(e.detail)} · ${text('attempt')} ${esc(e.attempt||1)}</span></li>`).join('')}</ol><h3>${text('branch')}</h3><div class="muted">${trace.map(e=>esc(e.route||e.step)).join(' → ')}</div></aside>`}
+async function resumeTask(interruptKey,response){const version=++viewVersion,caseId=lastDecision?.case_id,lang=$('#lang').value;try{const d=await jsonFetch('/api/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interrupt_key:interruptKey,response,lang})});if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(d)}catch(e){if(version===viewVersion)errorCard(e.message)}}function approve(k){resumeTask(k,{approved:true})}function reject(k){const reason=$('#reject-reason').value.trim();if(reason)resumeTask(k,{approved:false,reason})}function submitEvidence(k,docs){resumeTask(k,{documents:docs.map(type=>({type,status:'verified'}))})}function acknowledge(k){resumeTask(k,{acknowledged:true})}
+async function run(){const version=++viewVersion,caseId=$('#case').value,lang=$('#lang').value;try{const d=await jsonFetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({case_id:caseId,planner_mode:$('#planner').value,lang})});if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(d)}catch(e){if(version===viewVersion)errorCard(e.message)}}async function init(){try{const cs=await jsonFetch('/api/cases');$('#case').innerHTML=cs.map(c=>`<option value="${esc(c.case_id)}">${esc(c.case_id)} — ${esc(c.title)}</option>`).join('')}catch(e){errorCard(e.message)}}async function onLangChange(){const version=++viewVersion,decision=lastDecision,caseId=$('#case').value,lang=$('#lang').value;applyChrome();if(!decision)return;try{const d=await jsonFetch('/api/relocalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision_id:decision.decision_id,lang})});if(version===viewVersion&&caseId===$('#case').value&&lang===$('#lang').value)render(d)}catch(e){if(version===viewVersion)errorCard(e.message)}}$('#run').addEventListener('click',run);$('#case').addEventListener('change',clearDecision);$('#lang').addEventListener('change',onLangChange);init();
+// Localized confidence/cost fallback: text('confidence'), text('notAvailable').
+applyChrome();</script></body></html>

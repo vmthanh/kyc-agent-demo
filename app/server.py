@@ -1,9 +1,11 @@
-"""Zero-dependency HTTP demo: no extra process, no external services.
+"""Zero-dependency local HTTP demo: one process, no second local service.
 
 This is the recommended surface for a live interview -- it starts in under a
-second and never depends on network access. `app/ui.py` (Streamlit) is the
-optional, richer surface for showing LangGraph's native interrupt/resume UI
-and MLflow tracing side by side with a real OpenRouter model.
+second. Its live `normal` and `compromised_demo` planner modes do require
+network access and an ``OPENROUTER_API_KEY``; deterministic eval doubles keep
+offline tests network-free. `app/ui.py` (Streamlit) is the optional, richer
+surface for showing LangGraph's native interrupt/resume UI and MLflow tracing
+side by side with a real OpenRouter model.
 
 One `KYCExceptionAgent` is shared by every request in this process. Planner
 and language are per-request fields, not separate agent instances, so
@@ -51,30 +53,67 @@ class Handler(BaseHTTPRequestHandler):
         try:
             size = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(size) or b"{}")
+            if not isinstance(payload, dict):
+                raise ValueError("JSON body must be an object")
             if self.path == "/api/run":
+                explicit_mode = "planner_mode" in payload
+                planner_mode = payload.get("planner_mode") if explicit_mode else payload.get("planner", "normal")
+                if explicit_mode:
+                    if not isinstance(planner_mode, str):
+                        raise ValueError("planner_mode must be a string")
+                    if planner_mode not in {"normal", "compromised_demo"}:
+                        raise ValueError(f"Unknown planner mode: {planner_mode}")
+                elif not isinstance(planner_mode, str):
+                    raise ValueError("planner must be a string")
+                lang = payload.get("lang", "en")
+                if not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.run(
                     str(payload["case_id"]),
                     planner_name=payload.get("planner"),
-                    lang=str(payload.get("lang", "en")),
+                    lang=lang,
+                    planner_mode=planner_mode,
                 )
+                return self._json(decision.to_dict())
+            if self.path == "/api/resume":
+                interrupt_key = str(payload["interrupt_key"])
+                response = payload["response"]
+                if not isinstance(response, dict):
+                    raise ValueError("response must be an object")
+                lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
+                decision = AGENT.resume(interrupt_key, dict(response), lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/approve":
                 key = str(payload["approval_key"])
                 lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.approve(key, lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/reject":
                 key = str(payload["approval_key"])
                 reason = str(payload["reason"])
                 lang = payload.get("lang")
+                if lang is not None and not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
                 decision = AGENT.reject(key, reason, lang=lang)
                 return self._json(decision.to_dict())
             if self.path == "/api/relocalize":
-                decision = AGENT.relocalize(str(payload["decision_id"]), str(payload.get("lang", "en")))
+                lang = payload.get("lang", "en")
+                if not isinstance(lang, str):
+                    raise ValueError("lang must be a string")
+                decision = AGENT.relocalize(str(payload["decision_id"]), lang)
                 return self._json(decision.to_dict())
             self.send_error(404)
         except KeyError as exc:
-            self._json({"error": f"Unknown or missing field: {exc}"}, 404)
+            # Missing request fields are client errors; an unknown interrupt
+            # key is also deliberately visible as a 404 for stale UI actions.
+            message = str(exc).strip("'")
+            # Agent-raised stale handles are 404; request-shape omissions are 400.
+            status = 404 if message.lower().startswith("unknown or already resolved") else 400
+            self._json({"error": message if status == 404 else f"Unknown or missing field: {exc}"}, status)
         except ToolError as exc:
             self._json({"error": str(exc)}, 404)
         except ValueError as exc:

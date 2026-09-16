@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 from pathlib import Path
@@ -14,6 +15,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ToolError(RuntimeError):
     pass
+
+
+class TransientToolError(ToolError):
+    """A retryable failure from an authoritative domain tool."""
+
+
+def action_idempotency_key(action_payload: dict[str, Any]) -> str:
+    """Return a stable, payload-sensitive key for an approved action."""
+    canonical = json.dumps(action_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 class DomainTools:
@@ -65,7 +76,14 @@ class DomainTools:
 
     def _verify_documents(self, p: dict[str, Any]) -> dict[str, Any]:
         c = self._case(str(p["case_id"]))
-        return c["document_verification"]
+        result = dict(c["document_verification"])
+        verified = {
+            str(item["type"])
+            for item in p.get("submitted_documents", [])
+            if item.get("status") == "verified"
+        }
+        result["missing_fields"] = [field for field in result["missing_fields"] if field not in verified]
+        return result
 
     def _screen_sanctions(self, p: dict[str, Any]) -> dict[str, Any]:
         c = self._case(str(p["case_id"]))

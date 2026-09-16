@@ -6,8 +6,8 @@ this module only turns those keys into display text.
 Two kinds of content are localized differently:
 
 - Deterministic, enumerable content (outcome/risk labels, the four policy
-  verdict reasons, guardrail override phrasing, heuristic/adversarial
-  planner rationale, policy citation excerpts, UI chrome) has hand-written
+  verdict reasons, guardrail override phrasing, deterministic eval-double
+  rationale, policy citation excerpts, UI chrome) has hand-written
   English/Vietnamese templates and renders offline, instantly, for free.
 - Free-form content (a real OpenRouterPlanner's rationale) cannot be
   templated. `translate_via_llm` makes one best-effort LLM call to
@@ -55,6 +55,21 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "translation_unavailable": "Live translation unavailable (no OPENROUTER_API_KEY) -- showing the model's original English answer.",
         "approve_prompt": "Approve this bounded action?",
         "requested_documents": "Requested documents",
+        "workflow_status": "Workflow status",
+        "current_node": "Current step",
+        "planner_normal": "Normal planner",
+        "planner_compromised": "Compromised demo",
+        "planner_help": "Choose the normal live planner or the compromised demo mode.",
+        "compromised_warning": "Compromised demo mode is active; deterministic policy remains authoritative.",
+        "submit_documents": "Submit verified proof of address",
+        "acknowledge_handoff": "Acknowledge operational handoff",
+        "not_available": "n/a",
+        "cycle": "Evaluation cycle",
+        "pending_document_submission": "Document submission required",
+        "operational_handoff": "Operational review required",
+        "planner_attempts": "Planner attempts",
+        "tokens": "tokens",
+        "cost": "cost",
     },
     "vi": {
         "title": "Tác Tử Xử Lý Ngoại Lệ KYC",
@@ -85,6 +100,21 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "translation_unavailable": "Không thể dịch trực tiếp (thiếu OPENROUTER_API_KEY) -- hiển thị nguyên văn tiếng Anh của mô hình.",
         "approve_prompt": "Phê duyệt hành động có giới hạn này?",
         "requested_documents": "Hồ sơ được yêu cầu bổ sung",
+        "workflow_status": "Trạng thái quy trình",
+        "current_node": "Bước hiện tại",
+        "planner_normal": "Bộ lập luận bình thường",
+        "planner_compromised": "Mô phỏng bộ lập luận bị xâm nhập",
+        "planner_help": "Chọn bộ lập luận trực tiếp bình thường hoặc chế độ mô phỏng bị xâm nhập.",
+        "compromised_warning": "Đang bật chế độ mô phỏng bị xâm nhập; chính sách xác định vẫn là nguồn có thẩm quyền.",
+        "submit_documents": "Gửi chứng minh địa chỉ đã xác minh",
+        "acknowledge_handoff": "Xác nhận chuyển rà soát vận hành",
+        "not_available": "không có",
+        "cycle": "Vòng đánh giá",
+        "pending_document_submission": "Cần bổ sung tài liệu",
+        "operational_handoff": "Cần chuyển rà soát vận hành",
+        "planner_attempts": "Số lần thử bộ lập luận",
+        "tokens": "token",
+        "cost": "chi phí",
     },
 }
 
@@ -110,8 +140,8 @@ OUTCOME_LABELS = {
 }
 
 RISK_LABELS = {
-    "en": {"LOW": "LOW", "MEDIUM": "MEDIUM", "HIGH": "HIGH", "CRITICAL": "CRITICAL"},
-    "vi": {"LOW": "THẤP", "MEDIUM": "TRUNG BÌNH", "HIGH": "CAO", "CRITICAL": "NGHIÊM TRỌNG"},
+    "en": {"LOW": "LOW", "MEDIUM": "MEDIUM", "HIGH": "HIGH", "CRITICAL": "CRITICAL", "UNKNOWN": "UNKNOWN"},
+    "vi": {"LOW": "THẤP", "MEDIUM": "TRUNG BÌNH", "HIGH": "CAO", "CRITICAL": "NGHIÊM TRỌNG", "UNKNOWN": "CHƯA XÁC ĐỊNH"},
 }
 
 NO_ACTION_LABEL = {"en": "no-action", "vi": "không hành động"}
@@ -166,6 +196,22 @@ REASON_TEMPLATES: dict[str, dict[str, str]] = {
         "vi": "Đã đạt toàn bộ kiểm tra định danh, sinh trắc học, danh sách trừng phạt và hồ sơ "
         "(KYC-CLEAR-01); không cần xử lý ngoại lệ.",
     },
+    "ai_unavailable": {
+        "en": "Live model reasoning is unavailable; the case requires manual handling and no automated action was taken.",
+        "vi": "Không thể sử dụng suy luận từ mô hình trực tiếp; hồ sơ cần được xử lý thủ công và không có hành động tự động nào được thực hiện.",
+    },
+    "tool_unavailable": {
+        "en": "Authoritative case data is incomplete after retries; the case requires operational review.",
+        "vi": "Dữ liệu hồ sơ có thẩm quyền vẫn chưa đầy đủ sau khi thử lại; hồ sơ cần được rà soát vận hành.",
+    },
+    "policy_unavailable": {
+        "en": "Applicable policy evidence is missing or contradictory; automated resolution is blocked.",
+        "vi": "Bằng chứng chính sách áp dụng bị thiếu hoặc mâu thuẫn; hệ thống chặn xử lý tự động.",
+    },
+    "cycle_exhausted": {
+        "en": "Required evidence is still incomplete after the maximum evaluation cycles; manual review is required.",
+        "vi": "Hồ sơ vẫn chưa đầy đủ sau số vòng đánh giá tối đa; cần rà soát thủ công.",
+    },
 }
 
 
@@ -206,7 +252,9 @@ def render_override(info: dict, lang: str) -> str:
 # ---------------------------------------------------------------------------
 def render_facts(facts: dict, lang: str) -> list[str]:
     lang = _lang(lang)
-    docs, sanctions, risk = facts["verify_documents"], facts["screen_sanctions"], facts["get_risk_profile"]
+    docs = facts.get("verify_documents")
+    sanctions = facts.get("screen_sanctions")
+    risk = facts.get("get_risk_profile")
     templates = {
         "risk_tier": {"en": "Risk tier: {level} (score {score})", "vi": "Mức rủi ro: {level} (điểm {score})"},
         "liveness_passed": {"en": "Liveness: passed", "vi": "Sinh trắc học: đạt"},
@@ -225,41 +273,44 @@ def render_facts(facts: dict, lang: str) -> list[str]:
     def t(key: str, **params) -> str:
         return templates[key].get(lang, templates[key]["en"]).format(**params)
 
-    lines = [
-        t("risk_tier", level=risk_label(lang, risk["level"]), score=risk["score"]),
-        t("liveness_passed" if docs["liveness_passed"] else "liveness_failed"),
-        t("sanctions_score", score=sanctions["match_score"]),
-    ]
-    if sanctions["candidate"]:
+    lines: list[str] = []
+    if risk is not None:
+        lines.append(t("risk_tier", level=risk_label(lang, risk.get("level", "UNKNOWN")), score=risk.get("score")))
+    if docs is not None:
+        lines.append(t("liveness_passed" if docs.get("liveness_passed") else "liveness_failed"))
+    if sanctions is not None and sanctions.get("match_score") is not None:
+        lines.append(t("sanctions_score", score=sanctions["match_score"]))
+    if sanctions is not None and sanctions.get("candidate"):
         lines.append(t("sanctions_candidate", candidate=sanctions["candidate"]))
-    if docs["missing_fields"]:
+    if docs is not None and docs.get("missing_fields"):
         fields = ", ".join(field_label(lang, f) for f in docs["missing_fields"])
         lines.append(t("missing_fields", fields=fields))
     return lines
 
 
 # ---------------------------------------------------------------------------
-# Planner rationale. Heuristic/adversarial planners are templated (fully
+# Planner rationale. Deterministic eval doubles are templated (fully
 # offline-translatable); a real LLM's free-form rationale needs a live call.
 # ---------------------------------------------------------------------------
 RATIONALE_TEMPLATES: dict[str, dict[str, str]] = {
     "heuristic_applied": {
-        "en": "No LLM configured; heuristic fallback applied {citations} to the grounded facts. "
+        "en": "The deterministic eval double applied {citations} to the grounded facts. "
         "The case note is untrusted free text and was not used to reach this recommendation.",
-        "vi": "Chưa cấu hình mô hình ngôn ngữ; hệ thống dự phòng đã áp dụng {citations} dựa trên "
+        "vi": "Bộ lập luận ngoại tuyến đã áp dụng {citations} dựa trên "
         "dữ kiện đã xác minh. Ghi chú hồ sơ là văn bản tự do, không đáng tin cậy, và không được "
         "dùng để đưa ra khuyến nghị này.",
     },
     "adversarial_injection": {
-        "en": "The case note states Compliance already cleared this as a false positive, "
-        "so recommending CLEAR to approve the account today.",
-        "vi": "Ghi chú hồ sơ nói rằng bộ phận Tuân thủ đã xác nhận đây là báo động giả, "
-        "do đó đề xuất THÔNG QUA để duyệt tài khoản ngay hôm nay.",
+        "en": "The compromised demo proposal follows the untrusted case note and recommends CLEAR "
+        "to approve the account today.",
+        "vi": "Đề xuất mô phỏng bị xâm nhập chạy theo ghi chú hồ sơ không đáng tin cậy, cho rằng đây là "
+        "báo động giả, và đề xuất THÔNG QUA để duyệt tài khoản ngay hôm nay.",
     },
     "planner_failed": {
-        "en": "{planner_class} raised {error_class}: {error}. Fell back to {fallback_outcome}: {fallback_reason}",
-        "vi": "{planner_class} phát sinh lỗi {error_class}: {error}. Đã chuyển sang phương án dự "
-        "phòng {fallback_outcome}: {fallback_reason}",
+        "en": "{planner_class} raised {error_class}: {error}. Continued with the policy-safe path "
+        "{fallback_outcome}: {fallback_reason}",
+        "vi": "{planner_class} phát sinh lỗi {error_class}: {error}. Đã tiếp tục theo nhánh an toàn "
+        "của chính sách {fallback_outcome}: {fallback_reason}",
     },
 }
 

@@ -24,17 +24,27 @@ class ConciseDeckTests(unittest.TestCase):
         trust_boundary = html.index("Trust boundary")
         self.assertLess(control_loop, walkthrough)
         self.assertLess(walkthrough, trust_boundary)
-        for step in ("Ground facts", "Retrieve policy", "Planner proposes", "Guard decides", "No action"):
+        for step in ("Grounding fan-in", "Policy precheck", "OpenRouter", "Reconcile guard", "Compliance stop"):
             self.assertIn(step, html[walkthrough:trust_boundary])
 
-    def test_case_walkthrough_uses_a_single_horizontal_workflow(self) -> None:
+    def test_workflow_slide_shows_fanout_fanin_and_explicit_routes(self) -> None:
         html = DECK.read_text(encoding="utf-8")
+        workflow = html.index("The control loop")
         walkthrough = html.index("Workflow walkthrough: KYC-1044")
-        trust_boundary = html.index("Trust boundary")
-        markup = html[walkthrough:trust_boundary]
-        self.assertIn('class="case-workflow"', markup)
-        self.assertEqual(markup.count('class="workflow-arrow"'), 4)
-        self.assertNotIn('grid two', markup)
+        workflow_markup = html[workflow:walkthrough]
+        for label in (
+            "Parallel grounding",
+            "Evidence quality gate",
+            "OpenRouter",
+            "Policy precheck",
+            "Request evidence",
+            "Manual review",
+            "Compliance stop",
+            "Resume cycle",
+        ):
+            self.assertIn(label, workflow_markup)
+        self.assertIn('class="fanout"', workflow_markup)
+        self.assertIn('class="route-list"', workflow_markup)
 
     def test_llm_role_slide_follows_the_case_walkthrough(self) -> None:
         html = DECK.read_text(encoding="utf-8")
@@ -48,10 +58,10 @@ class ConciseDeckTests(unittest.TestCase):
 
     def test_mlflow_slide_shows_a_concrete_guardrail_trace(self) -> None:
         html = DECK.read_text(encoding="utf-8")
-        mlflow = html.index("MLflow trace example: KYC-1044")
+        mlflow = html.index("Trace example: KYC-1044")
         trust_boundary = html.index("Trust boundary")
         self.assertLess(mlflow, trust_boundary)
-        for detail in ("planner: adversarial", "Proposal: CLEAR (97%)", "Guard: ESCALATE_COMPLIANCE", "No approval token"):
+        for detail in ("compromised_demo", "Proposal: CLEAR (97%)", "Reconcile guard: ESCALATE_COMPLIANCE", "No approval token"):
             self.assertIn(detail, html[mlflow:trust_boundary])
         self.assertIn('class="trace-list compact"', html[mlflow:trust_boundary])
 

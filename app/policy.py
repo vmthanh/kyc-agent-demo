@@ -3,8 +3,8 @@
 This module is the safety boundary of the agent. It is pure (no I/O, no
 model calls, no language) and cheap to unit test exhaustively. `evaluate()`
 computes the mandated outcome directly from typed, tool-sourced facts.
-`guard()` compares that mandate against whatever the planner (LLM or
-fallback) proposed and always keeps the mandate -- the model may explain and
+`guard()` compares that mandate against the live planner or an eval double
+and always keeps the mandate -- the model may explain and
 add nuance, but it can never talk its way past a compliance stop, an
 identity conflict, or an evidence gap, even if the case note tries to
 instruct it to.
@@ -86,12 +86,11 @@ class GuardResult:
     override_info: dict[str, Any] | None  # None when the model's proposal already matched the mandate
 
 
-def guard(facts: dict[str, Any], proposal: LLMProposal) -> GuardResult:
-    """Verify the planner's proposal against the independently computed mandate."""
-    verdict = evaluate(facts)
+def guard_verdict(verdict: PolicyVerdict, proposal: LLMProposal) -> GuardResult:
+    """Reconcile an already-computed mandate with an advisory proposal."""
     if proposal.outcome == verdict.outcome.value and proposal.action == verdict.action:
         return GuardResult(verdict, None)
-    override_info = {
+    return GuardResult(verdict, {
         "model": proposal.model,
         "proposal_outcome": proposal.outcome,
         "proposal_action": proposal.action,
@@ -99,5 +98,9 @@ def guard(facts: dict[str, Any], proposal: LLMProposal) -> GuardResult:
         "final_action": verdict.action,
         "reason_key": verdict.reason_key,
         "reason_params": verdict.reason_params,
-    }
-    return GuardResult(verdict, override_info)
+    })
+
+
+def guard(facts: dict[str, Any], proposal: LLMProposal) -> GuardResult:
+    """Verify the planner's proposal against the independently computed mandate."""
+    return guard_verdict(evaluate(facts), proposal)
