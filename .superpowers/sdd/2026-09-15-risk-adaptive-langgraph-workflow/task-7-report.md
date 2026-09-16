@@ -13,3 +13,12 @@ Verification:
 python -m unittest tests.test_workflow_graph -v   # 6 passed
 python -m unittest discover -s tests -v           # 88 passed
 ```
+
+Reviewer follow-up fixes:
+
+- Grounding failures are retried and sanitized into operational handoff state.
+- Pending interrupt labels now expose the active action/document/operations node.
+- Resume removes an interrupt only after successful graph validation/invocation.
+- Streamlit handles missing planner confidence safely.
+
+Updated verification: graph tests 8 passed; full suite 90 passed.

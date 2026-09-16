@@ -63,14 +63,24 @@ def build_workflow_graph(
 
     builder = StateGraph(WorkflowState)
     builder.add_node("intake", nodes.intake)
+    def safe_grounding(name: str, field: str):
+        fn = getattr(nodes, name)
+        def wrapped(state: WorkflowState):
+            last: BaseException | None = None
+            for _ in range(3):
+                try:
+                    return fn(state)
+                except TransientToolError as exc:
+                    last = exc
+            return nodes.tool_error_handler(field)(state, NodeError(last or TransientToolError("unavailable"), name))
+        return wrapped
     for name in GROUNDING_NODES:
-        builder.add_node(name, getattr(nodes, name), retry_policy=policies.tool,
-                         error_handler=adapt(nodes.tool_error_handler({
-                             "load_customer": "customer_facts",
-                             "verify_documents": "document_facts",
-                             "screen_watchlists": "screening_facts",
-                             "load_risk": "risk_facts",
-                         }[name]), "evidence_gate"))
+        field = {
+            "load_customer": "customer_facts", "verify_documents": "document_facts",
+            "screen_watchlists": "screening_facts", "load_risk": "risk_facts",
+        }[name]
+        builder.add_node(name, safe_grounding(name, field), retry_policy=policies.tool,
+                         error_handler=adapt(nodes.tool_error_handler(field), "evidence_gate"))
     builder.add_node("evidence_gate", nodes.evidence_gate)
     builder.add_node("retrieve_policy", nodes.retrieve_policy)
     builder.add_node("policy_precheck", nodes.policy_precheck)

@@ -80,7 +80,11 @@ if decision is not None:
 
         st.markdown(f"**{i18n.ui_text(lang, 'planner_rationale')}**")
         st.write(decision.llm_rationale)
-        confidence_note = f"{i18n.ui_text(lang, 'confidence')}: {decision.proposal_confidence:.0%}"
+        confidence_note = (
+            f"{i18n.ui_text(lang, 'confidence')}: {decision.proposal_confidence:.0%}"
+            if decision.proposal_confidence is not None
+            else f"{i18n.ui_text(lang, 'confidence')}: unavailable"
+        )
         if decision.guardrail_override:
             confidence_note += f" ({i18n.ui_text(lang, 'overridden')})"
         if not decision.rationale_translated:

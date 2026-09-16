@@ -47,10 +47,11 @@ class KYCExceptionAgent:
 
     def resume(self, interrupt_key: str, response: dict[str, Any], lang: str | None = None) -> AgentDecision:
         with self._lock:
-            pending = self._pending_tasks.pop(interrupt_key, None)
+            pending = self._pending_tasks.get(interrupt_key)
             if pending is None:
                 raise KeyError("Unknown or already resolved interrupt")
             result = pending["graph"].invoke(Command(resume=response), pending["config"])
+            self._pending_tasks.pop(interrupt_key, None)
             self._cache_result(pending["decision_id"], pending["case_id"], result, pending["config"], pending["graph"])
             return self._to_decision(pending["case_id"], result, pending["config"], pending["graph"], lang or result.get("lang", "en"), pending["decision_id"])
 
@@ -131,7 +132,10 @@ class KYCExceptionAgent:
             tool_calls=[ToolCall(**c) for c in result.get("tool_calls", [])], trace=[TraceEvent(**t) for t in result.get("trace", [])],
             model=proposal.model if proposal else None, llm_rationale=rationale, lang=lang, rationale_translated=translated,
             guardrail_override=override, approval=approval, executed_action=action_result if action_result.get("status") == "executed" else None,
-            review_result=review_view, ontology_path=ONTOLOGY_PATH, workflow_status=status, current_node=result.get("current_node", "finalize"),
+            review_result=review_view, ontology_path=ONTOLOGY_PATH, workflow_status=status,
+            current_node=("action_review" if pending_task and pending_task.kind is PendingTaskKind.ACTION_APPROVAL else
+                          "await_documents" if pending_task and pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION else
+                          "operational_review" if pending_task else result.get("current_node", "finalize")),
             cycle_count=result.get("cycle_count", 1), max_cycles=result.get("max_cycles", 2), pending_task=pending_task,
             planner_attempts=result.get("planner_attempts", 0), planner_usage=proposal.usage if proposal else {},
         )

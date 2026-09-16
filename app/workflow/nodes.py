@@ -276,6 +276,7 @@ class WorkflowNodes:
         return {
             "review_result": review,
             "action_payload": payload,
+            "current_node": "action_review",
             "trace": [self._event(
                 state, "action_review", "Human action review",
                 "Action approval recorded" if response["approved"] else f"Reviewer rejected: {review['reason']}",
@@ -308,6 +309,7 @@ class WorkflowNodes:
         })
         return {
             "document_submission": response,
+            "current_node": "await_documents",
             "trace": [self._event(state, "await_documents", "Await requested evidence", "Document submission received", runtime=runtime)],
         }
 
@@ -362,6 +364,7 @@ class WorkflowNodes:
         update.update({
             "review_result": response,
             "action_payload": None,
+            "current_node": "operational_review",
             "trace": [self._event(state, "operational_review", "Operational review acknowledged", reason, "degraded", runtime)],
         })
         return update

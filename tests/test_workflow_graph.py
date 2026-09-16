@@ -28,6 +28,11 @@ class FailingActionTools(DomainTools):
         raise TransientToolError("simulated action outage")
 
 
+class FailingGroundingTools(DomainTools):
+    def call(self, *args, **kwargs):
+        raise TransientToolError("credential=secret")
+
+
 class WorkflowGraphTests(unittest.TestCase):
     def test_missing_evidence_resumes_same_run_and_clears_on_cycle_two(self):
         agent = KYCExceptionAgent()
@@ -78,3 +83,17 @@ class WorkflowGraphTests(unittest.TestCase):
         self.assertEqual(tools.action_attempts, 3)
         self.assertEqual(result.pending_task.kind, PendingTaskKind.OPERATIONAL_REVIEW)
 
+    def test_exhausted_grounding_retries_are_sanitized_and_handed_off(self):
+        result = KYCExceptionAgent(tools=FailingGroundingTools()).run("KYC-1042", planner=HeuristicPlanner())
+        self.assertEqual(result.workflow_status, WorkflowStatus.AWAITING_OPERATIONS)
+        self.assertEqual(result.pending_task.kind, PendingTaskKind.OPERATIONAL_REVIEW)
+        self.assertNotIn("secret", " ".join(event.detail for event in result.trace))
+
+    def test_malformed_resume_keeps_interrupt_registered_and_current_node_is_labeled(self):
+        agent = KYCExceptionAgent()
+        first = agent.run("KYC-1042", planner=HeuristicPlanner())
+        key = first.pending_task.interrupt_key
+        self.assertEqual(first.current_node, "action_review")
+        with self.assertRaises(ValueError):
+            agent.resume(key, {"approved": "yes"})
+        self.assertTrue(agent.has_pending(key))
