@@ -9,10 +9,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from langgraph.types import interrupt
+
 from ..domain import LLMProposal, Outcome, PolicyCitation
 from ..planner import Planner
 from ..policy import PolicyVerdict, evaluate, guard_verdict, tags_for
-from ..tools import DomainTools
+from ..tools import DomainTools, action_idempotency_key
 from .state import WorkflowState
 
 
@@ -249,4 +251,136 @@ class WorkflowNodes:
             "action_payload": None,
             "operational_reason": reason,
             "trace": [self._event(state, "safe_failure", "Safe failure route", "Deterministic policy remains authoritative", "degraded", runtime)],
+        }
+
+    def action_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        """Pause before a write, presenting the exact bounded payload to a reviewer."""
+        payload = (state.get("decision") or {}).get("action_payload")
+        if not isinstance(payload, dict):
+            raise ValueError("action_payload is required for approval")
+        response = interrupt({
+            "kind": "action_approval",
+            "case_id": state["case_id"],
+            "run_id": state["run_id"],
+            "message_key": "approve_prompt",
+            "action_payload": payload,
+            "allowed_responses": ["approve", "reject"],
+        })
+        if not isinstance(response, dict) or not isinstance(response.get("approved"), bool):
+            raise ValueError("approval response must include a boolean approved field")
+        if not response["approved"] and not str(response.get("reason", "")).strip():
+            raise ValueError("rejection reason is required")
+        review = {"approved": response["approved"]}
+        if not response["approved"]:
+            review["reason"] = str(response["reason"]).strip()
+        return {
+            "review_result": review,
+            "action_payload": payload,
+            "trace": [self._event(state, "action_review", "Human action review", "Action approval recorded", runtime=runtime)],
+        }
+
+    def execute_action(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        review = state.get("review_result") or {}
+        if review.get("approved") is not True:
+            raise PermissionError("action requires explicit approval")
+        payload = (state.get("decision") or {}).get("action_payload")
+        if not isinstance(payload, dict):
+            raise ValueError("action_payload is required for execution")
+        result = self.tools.execute_approved_action(payload, action_idempotency_key(payload))
+        return {
+            "action_result": result,
+            "trace": [self._event(state, "execute_action", "Execute approved action", "Action gateway completed", runtime=runtime)],
+        }
+
+    def await_documents(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        payload = (state.get("decision") or {}).get("action_payload") or {}
+        documents = list(payload.get("documents", []))
+        response = interrupt({
+            "kind": "document_submission",
+            "case_id": state["case_id"],
+            "run_id": state["run_id"],
+            "requested_documents": documents,
+            "allowed_responses": ["submit"],
+        })
+        return {
+            "document_submission": response,
+            "trace": [self._event(state, "await_documents", "Await requested evidence", "Document submission received", runtime=runtime)],
+        }
+
+    def validate_submission(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        payload = (state.get("decision") or {}).get("action_payload") or {}
+        required = set(payload.get("documents", []))
+        response = state.get("document_submission") or {}
+        documents = response.get("documents") if isinstance(response, dict) else None
+        valid_items = isinstance(documents, list) and all(
+            isinstance(item, dict) and isinstance(item.get("type"), str) and item.get("status") == "verified"
+            for item in documents
+        )
+        submitted = {item["type"] for item in documents} if valid_items else set()
+        valid = valid_items and required.issubset(submitted)
+        update: dict[str, Any] = {
+            "submission_valid": bool(valid),
+            "trace": [self._event(state, "validate_submission", "Validate submitted evidence", "Evidence accepted" if valid else "Evidence incomplete", "complete" if valid else "degraded", runtime)],
+        }
+        if valid:
+            update["submitted_documents"] = list(state.get("submitted_documents", [])) + list(documents)
+        return update
+
+    def increment_cycle(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        """Start the next bounded evidence cycle without erasing reducer-backed history."""
+        if state.get("cycle_count", 1) >= state.get("max_cycles", 2):
+            raise ValueError("maximum evidence cycles reached")
+        update: dict[str, Any] = {"cycle_count": state.get("cycle_count", 1) + 1, "current_node": "load_customer"}
+        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "policy_status", "proposal", "planner_status", "planner_attempts", "planner_error", "guardrail_override", "decision", "action_payload", "review_result", "action_result", "document_submission", "submission_valid", "operational_reason"):
+            update[field] = None
+        update.update({"policy_status": "pending", "planner_status": "pending", "planner_attempts": 0})
+        return update
+
+    def operational_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        reason = state.get("operational_reason") or "manual_review_required"
+        decision = state.get("decision")
+        update: dict[str, Any] = {}
+        if not decision:
+            decision = {
+                "outcome": "MANUAL_REVIEW", "action": None, "action_payload": None,
+                "risk_level": "UNKNOWN", "reason_key": reason, "reason_params": {},
+            }
+            update["decision"] = decision
+        response = interrupt({
+            "kind": "operational_review",
+            "case_id": state["case_id"],
+            "run_id": state["run_id"],
+            "operational_reason": reason,
+            "allowed_responses": ["acknowledge"],
+        })
+        if not isinstance(response, dict) or response.get("acknowledged") is not True:
+            raise ValueError("operational review requires acknowledgement")
+        update.update({
+            "review_result": response,
+            "action_payload": None,
+            "trace": [self._event(state, "operational_review", "Operational review acknowledged", reason, "degraded", runtime)],
+        })
+        return update
+
+    def _finalize(self, state: WorkflowState, status: str, title: str, runtime: Any = None) -> dict[str, Any]:
+        return {
+            "workflow_status": status,
+            "current_node": title,
+            "trace": [self._event(state, title, title.replace("_", " ").title(), f"Workflow ended with {status}", runtime=runtime)],
+        }
+
+    def finalize(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        return self._finalize(state, "COMPLETED", "finalize", runtime)
+
+    def finalize_blocked(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        return self._finalize(state, "BLOCKED", "finalize_blocked", runtime)
+
+    def finalize_rejected(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        return self._finalize(state, "REJECTED", "finalize_rejected", runtime)
+
+    def action_error_handler(self, state: WorkflowState, error: NodeError) -> dict[str, Any]:
+        return {
+            "action_result": {"status": "failed", "category": type(error.error).__name__},
+            "operational_reason": "tool_unavailable",
+            "trace": [self.event("execute_action", "Action unavailable", "Action retry policy exhausted; manual handling required", "degraded", state)],
         }

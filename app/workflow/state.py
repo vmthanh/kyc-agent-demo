@@ -38,6 +38,7 @@ class WorkflowState(TypedDict, total=False):
     action_payload: dict[str, Any] | None
     review_result: dict[str, Any] | None
     action_result: dict[str, Any] | None
+    document_submission: dict[str, Any] | None
     operational_reason: str | None
 
 

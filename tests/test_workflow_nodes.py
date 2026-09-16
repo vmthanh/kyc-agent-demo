@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app.domain import LLMProposal
 from app.planner import HeuristicPlanner
@@ -102,6 +103,122 @@ class WorkflowNodeTests(unittest.TestCase):
         update = self.nodes.safe_failure(state)
         self.assertEqual(update["decision"]["outcome"], "ESCALATE_COMPLIANCE")
         self.assertIsNone(update["action_payload"])
+
+
+class WorkflowHumanNodeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.nodes = WorkflowNodes(DomainTools(), HeuristicPlanner())
+        self.state = {
+            **initial_state("KYC-1042", "run-1", "en", "normal"),
+            "decision": {
+                "outcome": "REQUEST_EVIDENCE",
+                "action": "request_document",
+                "action_payload": {
+                    "case_id": "KYC-1042",
+                    "action": "request_document",
+                    "documents": ["proof_of_address"],
+                    "policy_versions": ["KYC-EVIDENCE-07:2026.3"],
+                },
+            },
+        }
+
+    @patch("app.workflow.nodes.interrupt", return_value={"approved": False, "reason": "Need a newer document"})
+    def test_rejection_records_reason_without_executing(self, mocked_interrupt) -> None:
+        update = self.nodes.action_review(self.state)
+        self.assertEqual(update["review_result"], {"approved": False, "reason": "Need a newer document"})
+        self.assertIsNone(update.get("action_result"))
+        mocked_interrupt.assert_called_once_with({
+            "kind": "action_approval",
+            "case_id": "KYC-1042",
+            "run_id": "run-1",
+            "message_key": "approve_prompt",
+            "action_payload": self.state["decision"]["action_payload"],
+            "allowed_responses": ["approve", "reject"],
+        })
+
+    @patch("app.workflow.nodes.interrupt", return_value={"approved": True})
+    def test_approval_keeps_exact_payload_for_execution(self, mocked_interrupt) -> None:
+        update = self.nodes.action_review(self.state)
+        self.assertEqual(update["review_result"], {"approved": True})
+        self.assertEqual(update["action_payload"], self.state["decision"]["action_payload"])
+
+    @patch("app.workflow.nodes.interrupt", return_value={"approved": False, "reason": "   "})
+    def test_rejection_requires_nonblank_reason(self, mocked_interrupt) -> None:
+        with self.assertRaises(ValueError):
+            self.nodes.action_review(self.state)
+
+    def test_execute_action_requires_approved_review_and_uses_payload_key(self) -> None:
+        with self.assertRaises(PermissionError):
+            self.nodes.execute_action(self.state)
+        with patch.object(self.nodes.tools, "execute_approved_action", return_value={"status": "executed"}) as execute:
+            state = {**self.state, "review_result": {"approved": True}}
+            update = self.nodes.execute_action(state)
+        execute.assert_called_once()
+        self.assertEqual(execute.call_args.args[0], self.state["decision"]["action_payload"])
+        self.assertEqual(update["action_result"], {"status": "executed"})
+
+    @patch("app.workflow.nodes.interrupt", return_value={
+        "documents": [{"type": "proof_of_address", "status": "verified"}]
+    })
+    def test_document_submission_is_validated_before_incrementing_cycle(self, mocked_interrupt) -> None:
+        resumed = self.nodes.await_documents(self.state)
+        validated = self.nodes.validate_submission({**self.state, **resumed})
+        self.assertTrue(validated["submission_valid"])
+        incremented = self.nodes.increment_cycle({**self.state, **resumed, **validated})
+        self.assertEqual(incremented["cycle_count"], 2)
+        self.assertEqual(validated["submitted_documents"], [{"type": "proof_of_address", "status": "verified"}])
+
+    @patch("app.workflow.nodes.interrupt", return_value={"documents": []})
+    def test_invalid_submission_preserves_existing_documents(self, mocked_interrupt) -> None:
+        state = {**self.state, "submitted_documents": [{"type": "passport", "status": "verified"}]}
+        resumed = self.nodes.await_documents(state)
+        validated = self.nodes.validate_submission({**state, **resumed})
+        self.assertFalse(validated["submission_valid"])
+        self.assertNotIn("submitted_documents", validated)
+
+    def test_increment_cycle_clears_cycle_fields_but_not_append_only_history(self) -> None:
+        state = {
+            **self.state,
+            "cycle_count": 1,
+            "customer_facts": {"x": 1}, "document_facts": {"x": 1},
+            "screening_facts": {"x": 1}, "risk_facts": {"x": 1},
+            "facts": {"x": 1}, "citations": [{"policy_id": "p"}],
+            "policy_verdict": {"outcome": "REQUEST_EVIDENCE"},
+            "proposal": {"outcome": "REQUEST_EVIDENCE"}, "decision": {"action": "request_document"},
+            "review_result": {"approved": True}, "action_result": {"status": "executed"},
+            "trace": [{"step": "old"}], "tool_calls": [{"name": "old"}], "tool_errors": [{"node": "old"}],
+            "submitted_documents": [{"type": "proof_of_address", "status": "verified"}],
+        }
+        update = self.nodes.increment_cycle(state)
+        self.assertEqual(update["cycle_count"], 2)
+        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "proposal", "decision", "review_result", "action_result"):
+            self.assertIsNone(update[field])
+        self.assertNotIn("trace", update)
+        self.assertNotIn("tool_calls", update)
+        self.assertNotIn("tool_errors", update)
+        self.assertNotIn("submitted_documents", update)
+
+    @patch("app.workflow.nodes.interrupt", return_value={"acknowledged": True})
+    def test_operational_review_creates_safe_manual_handoff(self, mocked_interrupt) -> None:
+        state = {**initial_state("KYC-1042", "run-1", "en", "normal"), "operational_reason": "tool_unavailable"}
+        update = self.nodes.operational_review(state)
+        self.assertEqual(update["decision"]["outcome"], "MANUAL_REVIEW")
+        self.assertEqual(update["decision"]["risk_level"], "UNKNOWN")
+        self.assertEqual(update["action_payload"], None)
+        self.assertEqual(update["review_result"], {"acknowledged": True})
+
+    def test_terminal_nodes_set_status_and_append_one_trace_event(self) -> None:
+        for name, expected in (("finalize", "COMPLETED"), ("finalize_blocked", "BLOCKED"), ("finalize_rejected", "REJECTED")):
+            update = getattr(self.nodes, name)(self.state)
+            self.assertEqual(update["workflow_status"], expected)
+            self.assertEqual(len(update["trace"]), 1)
+            self.assertEqual(update["trace"][0]["step"], name)
+
+    def test_action_error_handler_is_sanitized_and_degraded(self) -> None:
+        update = self.nodes.action_error_handler(self.state, NodeError(RuntimeError("credential=secret"), "execute_action"))
+        self.assertEqual(update["action_result"], {"status": "failed", "category": "RuntimeError"})
+        self.assertEqual(update["operational_reason"], "tool_unavailable")
+        self.assertNotIn("credential=secret", repr(update))
 
 
 if __name__ == "__main__":
