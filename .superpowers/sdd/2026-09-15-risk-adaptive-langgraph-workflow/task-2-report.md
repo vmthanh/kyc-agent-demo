@@ -36,4 +36,4 @@ Additional check: `git diff --check` passed.
 
 ## Commit
 
-`2f939c1` (`feat: add resumable workflow result contracts`)
+`550d5c7` (`feat: add resumable workflow result contracts`)
