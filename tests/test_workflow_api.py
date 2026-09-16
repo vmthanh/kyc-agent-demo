@@ -39,3 +39,13 @@ class WorkflowAPITests(unittest.TestCase):
         handler = self.make_handler("/api/resume", {"interrupt_key": "x", "response": ["bad"]})
         handler.do_POST()
         self.assertEqual(handler.response[1], 400)
+
+    def test_run_rejects_non_string_planner_mode(self) -> None:
+        handler = self.make_handler("/api/run", {"case_id": "KYC-1045", "planner_mode": []})
+        handler.do_POST()
+        self.assertEqual(handler.response[1], 400)
+
+    def test_missing_run_case_id_is_bad_request(self) -> None:
+        handler = self.make_handler("/api/run", {"planner_mode": "normal"})
+        handler.do_POST()
+        self.assertEqual(handler.response[1], 400)

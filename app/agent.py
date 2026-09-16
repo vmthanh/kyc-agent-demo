@@ -148,6 +148,7 @@ class KYCExceptionAgent:
                           "operational_review" if pending_task else result.get("current_node", "finalize")),
             cycle_count=result.get("cycle_count", 1), max_cycles=result.get("max_cycles", 2), pending_task=pending_task,
             planner_attempts=result.get("planner_attempts", 0), planner_usage=proposal.usage if proposal else {},
+            planner_mode=result.get("planner_mode", "normal"),
         )
 
     @staticmethod

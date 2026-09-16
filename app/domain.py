@@ -134,6 +134,7 @@ class AgentDecision:
     pending_task: PendingTask | None = None
     planner_attempts: int = 0
     planner_usage: dict[str, Any] = field(default_factory=dict)
+    planner_mode: str = "normal"
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)

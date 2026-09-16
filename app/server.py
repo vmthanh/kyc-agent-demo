@@ -53,6 +53,10 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(size) or b"{}")
             if self.path == "/api/run":
                 planner_mode = payload.get("planner_mode", payload.get("planner", "normal"))
+                if not isinstance(planner_mode, str):
+                    raise ValueError("planner_mode must be a string")
+                if planner_mode not in {"normal", "compromised_demo"}:
+                    raise ValueError(f"Unknown planner mode: {planner_mode}")
                 decision = AGENT.run(
                     str(payload["case_id"]),
                     planner_name=payload.get("planner"),
@@ -86,8 +90,9 @@ class Handler(BaseHTTPRequestHandler):
             # Missing request fields are client errors; an unknown interrupt
             # key is also deliberately visible as a 404 for stale UI actions.
             message = str(exc).strip("'")
-            status = 404 if "interrupt" in message.lower() or "approval" in message.lower() or "unknown" in message.lower() else 400
-            self._json({"error": f"Unknown or missing field: {exc}" if status == 400 else message}, status)
+            # Agent-raised stale handles are 404; request-shape omissions are 400.
+            status = 404 if message.lower().startswith("unknown or already resolved") else 400
+            self._json({"error": message if status == 404 else f"Unknown or missing field: {exc}"}, status)
         except ToolError as exc:
             self._json({"error": str(exc)}, 404)
         except ValueError as exc:
