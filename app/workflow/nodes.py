@@ -276,7 +276,11 @@ class WorkflowNodes:
         return {
             "review_result": review,
             "action_payload": payload,
-            "trace": [self._event(state, "action_review", "Human action review", "Action approval recorded", runtime=runtime)],
+            "trace": [self._event(
+                state, "action_review", "Human action review",
+                "Action approval recorded" if response["approved"] else f"Reviewer rejected: {review['reason']}",
+                runtime=runtime,
+            )],
         }
 
     def execute_action(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
