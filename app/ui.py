@@ -115,6 +115,8 @@ if decision is not None:
                 f"{i18n.ui_text(lang, 'approval_required')}: {decision.approval.action} "
                 f"(key `{decision.approval.approval_key}`)" + ("\n\n" + "; ".join(detail_bits) if detail_bits else "")
             )
+            st.caption(f"Pending case: {decision.case_id}")
+            st.json(decision.approval.payload.get("action_payload", decision.approval.payload))
             if st.button(i18n.ui_text(lang, "approve_button")):
                 st.session_state.decision = agent.resume(
                     decision.pending_task.interrupt_key, {"approved": True}, lang=lang

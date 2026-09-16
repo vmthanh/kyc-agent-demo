@@ -163,7 +163,11 @@ class WorkflowNodes:
             for citation in state.get("citations", [])
         }
         covered = required is not None and required in citation_ids
-        if not covered:
+        grouped: dict[tuple[str, str], set[str]] = {}
+        for citation in state.get("citations", []):
+            grouped.setdefault((citation["policy_id"], citation["version"]), set()).add(citation["excerpt"])
+        contradictory = any(len(excerpts) > 1 for excerpts in grouped.values())
+        if not covered or contradictory:
             return {
                 "policy_verdict": serialized,
                 "policy_status": "failed",
@@ -215,6 +219,9 @@ class WorkflowNodes:
             "action_payload": payload,
             "guardrail_override": result.override_info,
         }
+        if decision["outcome"] == "REQUEST_EVIDENCE" and state.get("cycle_count", 1) >= state.get("max_cycles", 2):
+            decision["reason_key"] = "cycle_exhausted"
+            decision["reason_params"] = {}
         return {
             "decision": decision,
             "action_payload": payload,
@@ -345,7 +352,13 @@ class WorkflowNodes:
     def operational_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         reason = state.get("operational_reason") or "manual_review_required"
         decision = state.get("decision")
+        exhausted_evidence = bool(decision and decision.get("outcome") == "REQUEST_EVIDENCE" and state.get("cycle_count", 1) >= state.get("max_cycles", 2))
+        if exhausted_evidence:
+            reason = "cycle_exhausted"
+            decision = {**decision, "reason_key": reason, "reason_params": {}}
         update: dict[str, Any] = {}
+        if exhausted_evidence:
+            update["decision"] = decision
         if not decision:
             decision = {
                 "outcome": "MANUAL_REVIEW", "action": None, "action_payload": None,

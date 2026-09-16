@@ -33,6 +33,14 @@ class FailingGroundingTools(DomainTools):
         raise TransientToolError("credential=secret")
 
 
+class PersistentEvidenceTools(DomainTools):
+    def call(self, name, purpose, payload):
+        call = super().call(name, purpose, payload)
+        if name == "verify_documents":
+            call.output["missing_fields"] = ["proof_of_address"]
+        return call
+
+
 class WorkflowGraphTests(unittest.TestCase):
     def test_missing_evidence_resumes_same_run_and_clears_on_cycle_two(self):
         agent = KYCExceptionAgent()
@@ -106,3 +114,12 @@ class WorkflowGraphTests(unittest.TestCase):
             agent.resume(key, {"approved": "yes"})
         approved = agent.approve(key)
         self.assertEqual(approved.pending_task.kind, PendingTaskKind.DOCUMENT_SUBMISSION)
+
+    def test_persistent_missing_evidence_hands_off_without_requesting_more_documents(self):
+        agent = KYCExceptionAgent(tools=PersistentEvidenceTools())
+        first = agent.run("KYC-1042", planner=HeuristicPlanner())
+        submitted = agent.approve(first.pending_task.interrupt_key)
+        exhausted = agent.resume(submitted.pending_task.interrupt_key, {"documents": [{"type": "proof_of_address", "status": "verified"}]})
+        self.assertEqual(exhausted.pending_task.kind, PendingTaskKind.OPERATIONAL_REVIEW)
+        self.assertIn("maximum", exhausted.summary)
+        self.assertNotIn("missing fields", exhausted.summary)

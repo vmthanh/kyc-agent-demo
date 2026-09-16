@@ -67,12 +67,16 @@ def build_workflow_graph(
         fn = getattr(nodes, name)
         def wrapped(state: WorkflowState):
             last: BaseException | None = None
-            for _ in range(3):
+            attempts = max(1, int(policies.tool.max_attempts))
+            for _ in range(attempts):
                 try:
                     return fn(state)
                 except TransientToolError as exc:
                     last = exc
-            return nodes.tool_error_handler(field)(state, NodeError(last or TransientToolError("unavailable"), name))
+            update = nodes.tool_error_handler(field)(state, NodeError(last or TransientToolError("unavailable"), name))
+            if update.get("trace"):
+                update["trace"][-1]["attempt"] = attempts
+            return update
         return wrapped
     for name in GROUNDING_NODES:
         field = {

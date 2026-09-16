@@ -28,3 +28,9 @@ before invoking LangGraph, so malformed input cannot poison the resumable
 checkpoint. Invalid-then-valid approval regression added.
 
 Final verification: graph tests 9 passed; full suite 113 passed.
+
+Additional review fixes: grounding retry counts now follow the injected retry
+policy; exhausted evidence is labeled `cycle_exhausted`; contradictory policy
+citations block planner invocation; and the Streamlit approval panel displays
+the immutable case-bound action payload. Final verification: graph tests 10
+passed; full suite 114 passed.
