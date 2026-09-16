@@ -22,7 +22,7 @@
 
 ```text
 .venv/bin/python -m unittest discover -s tests -v
-Ran 114 tests in 10.026s
+Ran 115 tests in 12.166s
 OK
 ```
 
@@ -43,7 +43,7 @@ changed slide markup was reviewed directly.
   doubles remain offline-only.
 - Clarified that the HTTP demo needs one local process, while live modes need
   an OpenRouter key/network connection.
-- Updated visible verification counts to 114 unit tests and 19 deterministic
+- Updated visible verification counts to 115 unit tests and 19 deterministic
   eval checks, and added the KYC-1042 cycle-one/cycle-two story to the full
   deck.
 - Added an explicit `CLEAR` guard outcome beside the separate Resume cycle
