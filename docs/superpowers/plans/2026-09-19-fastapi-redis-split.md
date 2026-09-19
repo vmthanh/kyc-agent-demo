@@ -16,7 +16,10 @@
 - The suite must run with **no infrastructure**. No test may require a live Redis or a live network call.
 - The API error contract is fixed: body is `{"error": "<message>"}`, status is **400** for bad requests and **404** for unknown cases and stale interrupt keys. FastAPI's default 422 `{"detail": [...]}` must never reach a client — `static/index.html` and the API tests both depend on the flat shape.
 - `app/cli.py` stays in-process and must not be modified.
-- 110 existing tests outside `tests/test_workflow_api.py` must stay green after every task.
+- Tasks 1–2 must retain all 118 existing tests. Task 3 migrates the 8 stdlib
+  API tests in `tests/test_workflow_api.py` and the 2 `app.server.Handler`
+  tests in `tests/test_agent.py`; the other 108 existing tests must stay green
+  after every task.
 - Verified facts this plan relies on, already confirmed against this codebase — do not re-litigate them:
   - `response_model=AgentDecision` serializes a key set exactly equal to `AgentDecision.__dataclass_fields__`, with `Outcome`, `WorkflowStatus` and `PendingTaskKind` rendered as their string values.
   - `TypeAdapter(AgentDecision).validate_python(body)` rehydrates nested dataclasses and returns real enum members, so `is`-comparison against `PendingTaskKind` still works.
@@ -274,6 +277,8 @@ git commit -m "feat: let the agent facade accept a checkpointer"
 - Create: `app/api.py`
 - Delete: `app/server.py`
 - Rewrite: `tests/test_workflow_api.py`
+- Modify: `tests/test_agent.py` (remove its two `Handler`-specific tests and
+  the `app.server` import)
 
 **Interfaces:**
 - Consumes: `make_checkpointer` (Task 1), `KYCExceptionAgent(tools=..., checkpointer=...)` (Task 2).
@@ -284,6 +289,7 @@ git commit -m "feat: let the agent facade accept a checkpointer"
 Replace the entire contents of `tests/test_workflow_api.py`:
 
 ```python
+import os
 import unittest
 from unittest.mock import patch
 
@@ -321,8 +327,18 @@ def a_decision(**overrides) -> AgentDecision:
 
 class WorkflowAPITests(unittest.TestCase):
     def setUp(self) -> None:
+        # Lifespan must be deterministic and infrastructure-free even when a
+        # developer shell has optional runtime integrations configured.
+        self.environment = patch.dict(
+            os.environ, {"REDIS_URL": "", "MLFLOW_TRACKING_URI": ""}
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
         self.client = TestClient(app)
-        self.addCleanup(self.client.close)
+        # TestClient starts a FastAPI lifespan only when entered. The lifespan
+        # owns app.state.agent and the checkpointer ExitStack.
+        self.client.__enter__()
+        self.addCleanup(self.client.__exit__, None, None, None)
 
     def agent(self):
         return app.state.agent
@@ -400,6 +416,17 @@ class WorkflowAPITests(unittest.TestCase):
             response = self.client.post("/api/run", json={"case_id": "KYC-9999"})
         self.assertEqual(response.status_code, 404)
 
+    def test_reject_endpoint_passes_the_review_reason_to_the_agent(self) -> None:
+        rejected = a_decision(review_result={"status": "rejected", "reason": "Evidence is too old"})
+        with patch.object(self.agent(), "reject", return_value=rejected) as reject:
+            response = self.client.post(
+                "/api/reject",
+                json={"approval_key": "approval-1", "reason": "Evidence is too old", "lang": "en"},
+            )
+        self.assertEqual(response.status_code, 200)
+        reject.assert_called_once_with("approval-1", "Evidence is too old", lang="en")
+        self.assertEqual(response.json()["review_result"]["reason"], "Evidence is too old")
+
     def test_empty_rejection_reason_is_bad_request(self) -> None:
         response = self.client.post("/api/reject", json={"approval_key": "k", "reason": "   "})
         self.assertEqual(response.status_code, 400)
@@ -415,18 +442,23 @@ class WorkflowAPITests(unittest.TestCase):
 
     def test_health_reports_the_checkpointer_backend(self) -> None:
         body = self.client.get("/health").json()
-        self.assertEqual(body["status"], "ok")
-        self.assertEqual(body["checkpointer"], "memory")
+        self.assertEqual(body, {"status": "ok", "checkpointer": "memory"})
 
     def test_cases_are_listed(self) -> None:
         body = self.client.get("/api/cases").json()
         self.assertTrue(body)
-        self.assertIn("case_id", body[0])
+        self.assertEqual(set(body[0]), {"case_id", "title", "signal"})
 
 
 if __name__ == "__main__":
     unittest.main()
 ```
+
+Also remove `from app.server import Handler` and the `HTTPServerTests` class
+from `tests/test_agent.py`. `test_unknown_case_is_not_found` above replaces its
+unknown-case assertion, and `test_reject_endpoint_passes_the_review_reason_to_the_agent`
+replaces its rejection-forwarding assertion. This must happen before deleting
+`app/server.py`; otherwise test collection fails.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -454,6 +486,7 @@ docs/superpowers/specs/2026-09-19-fastapi-redis-split-design.md.
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
@@ -517,9 +550,37 @@ class RelocalizeRequest(_Body):
     lang: str = "en"
 
 
+class HealthResponse(BaseModel):
+    status: str
+    checkpointer: str
+
+
+class CaseSummary(BaseModel):
+    case_id: str
+    title: str
+    signal: str
+
+
+def _enable_mlflow_autologging() -> None:
+    """Keep opt-in tracing beside the process that invokes LangGraph."""
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
+    if not tracking_uri:
+        logger.info("MLflow tracing disabled; set MLFLOW_TRACKING_URI to enable it")
+        return
+    try:
+        import mlflow
+
+        mlflow.set_tracking_uri(tracking_uri)
+        mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", "kyc-exception-agent-demo"))
+        mlflow.langchain.autolog()
+    except Exception as exc:  # best-effort tracing must not stop the runtime
+        logger.warning("MLflow tracing disabled: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     with ExitStack() as stack:
+        _enable_mlflow_autologging()
         checkpointer, backend = make_checkpointer(stack)
         tools = DomainTools()
         app.state.tools = tools
@@ -567,13 +628,13 @@ async def _on_value_error(request: Request, exc: ValueError) -> JSONResponse:
     return _error(str(exc), 400)
 
 
-@app.get("/health")
-def health(request: Request) -> dict[str, str]:
+@app.get("/health", response_model=HealthResponse)
+def health(request: Request) -> HealthResponse:
     return {"status": "ok", "checkpointer": request.app.state.checkpointer_backend}
 
 
-@app.get("/api/cases")
-def list_cases(request: Request) -> list[dict[str, Any]]:
+@app.get("/api/cases", response_model=list[CaseSummary])
+def list_cases(request: Request) -> list[CaseSummary]:
     return request.app.state.tools.list_cases()
 
 
@@ -628,7 +689,7 @@ if __name__ == "__main__":
 
 Run: `uv run python -m unittest tests.test_workflow_api -v`
 
-Expected: PASS, 17 tests.
+Expected: PASS, 18 tests.
 
 Two failure modes to expect and how to read them:
 - If `TestClient(app)` raises rather than returning a 4xx, Starlette is re-raising instead of using the handler. Confirm the handler is registered for the exact exception class.
@@ -640,17 +701,18 @@ Two failure modes to expect and how to read them:
 git rm app/server.py
 ```
 
-Then confirm nothing still imports it:
+Then confirm no Python code still imports it:
 
-Run: `grep -rn "app.server\|app\.server" --include=*.py --include=*.md . | grep -v '\.venv'`
+Run: `rg -n "app\.server" app tests --glob '*.py'`
 
-Expected: only `README.md` matches, which Task 6 updates. If any `.py` file matches, fix that import before continuing.
+Expected: no matches. Historical references in the design and implementation
+plan are intentional; Task 6 removes the README's runnable-command reference.
 
 - [ ] **Step 6: Run the full suite**
 
 Run: `uv run python -m unittest discover -s tests`
 
-Expected: OK, 133 tests.
+Expected: OK, 132 tests.
 
 - [ ] **Step 7: Verify the server actually starts and serves**
 
@@ -659,16 +721,16 @@ uv run python -m app.api &
 sleep 3
 curl -s localhost:8000/health
 curl -s -o /dev/null -w '%{http_code}\n' localhost:8000/
-curl -s -X POST localhost:8000/api/run -H 'Content-Type: application/json' -d '{"case_id":"bogus"}'
+curl -s -X POST localhost:8000/api/run -H 'Content-Type: application/json' -d '{"case_id":"bogus","planner":"heuristic"}'
 kill %1
 ```
 
-Expected: `{"status":"ok","checkpointer":"memory"}`, then `200`, then a 404 body `{"error":"Unknown case: bogus"}`.
+Expected: `{"status":"ok","checkpointer":"memory"}`, then `200`, then a 404 body `{"error":"Unknown case: bogus"}`. The legacy heuristic planner makes this check deterministic and avoids requiring `OPENROUTER_API_KEY` before the case lookup.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/api.py tests/test_workflow_api.py
+git add app/api.py tests/test_agent.py tests/test_workflow_api.py
 git rm --cached app/server.py 2>/dev/null; true
 git commit -m "feat: replace the stdlib demo server with a validated FastAPI runtime"
 ```
@@ -683,7 +745,7 @@ git commit -m "feat: replace the stdlib demo server with a validated FastAPI run
 
 **Interfaces:**
 - Consumes: the routes from Task 3.
-- Produces: `KYCClient(base_url, timeout=60.0)` with `list_cases() -> list[dict]`, and `run`, `resume`, `approve`, `reject`, `relocalize` all returning `AgentDecision`; plus `KYCAPIError(status: int, message: str)`. Task 5 consumes all of these.
+- Produces: `KYCClient(base_url, timeout=60.0)` with `list_cases() -> list[dict]`, and `run`, `resume`, `approve`, `reject`, `relocalize` all returning `AgentDecision`; plus `KYCAPIError(status: int | None, message: str)`. `status` is `None` for a transport failure. Task 5 consumes all of these.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -788,6 +850,16 @@ class KYCClientTests(unittest.TestCase):
             client.list_cases()
         self.assertEqual(caught.exception.status, 500)
 
+    def test_transport_failure_becomes_a_typed_exception(self) -> None:
+        def unavailable(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connection refused", request=request)
+
+        client = self.client(unavailable)
+        with self.assertRaises(KYCAPIError) as caught:
+            client.list_cases()
+        self.assertIsNone(caught.exception.status)
+        self.assertIn("Runtime unavailable", caught.exception.message)
+
     def test_list_cases_returns_raw_rows(self) -> None:
         rows = [{"case_id": "KYC-1", "title": "t", "signal": "s"}]
         client = self.client(lambda request: httpx.Response(200, json=rows))
@@ -829,10 +901,11 @@ _DECISION = TypeAdapter(AgentDecision)
 
 
 class KYCAPIError(RuntimeError):
-    """A non-2xx response, carrying the API's `{"error": ...}` message."""
+    """An API or transport failure, carrying a client-safe message."""
 
-    def __init__(self, status: int, message: str) -> None:
-        super().__init__(f"[{status}] {message}")
+    def __init__(self, status: int | None, message: str) -> None:
+        prefix = f"[{status}] " if status is not None else ""
+        super().__init__(f"{prefix}{message}")
         self.status = status
         self.message = message
 
@@ -846,7 +919,10 @@ class KYCClient:
         self._http.close()
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
-        response = self._http.request(method, path, json=payload)
+        try:
+            response = self._http.request(method, path, json=payload)
+        except httpx.HTTPError as exc:
+            raise KYCAPIError(None, f"Runtime unavailable: {exc}") from exc
         if response.status_code >= 400:
             try:
                 message = response.json().get("error", response.text)
@@ -890,7 +966,7 @@ class KYCClient:
 
 Run: `uv run python -m unittest tests.test_client -v`
 
-Expected: PASS, 6 tests.
+Expected: PASS, 7 tests.
 
 If `test_run_posts_the_expected_body` fails on an unexpected `lang` or `planner_mode` key, the client is sending defaults the test does not expect — reconcile the test against the client, not the other way round, since the API accepts both.
 
@@ -946,7 +1022,7 @@ from app.client import KYCAPIError, KYCClient
 from app.domain import PendingTaskKind
 ```
 
-`DomainTools` and `KYCExceptionAgent` imports are removed. `PendingTaskKind` stays — the client returns real enum members, so the `is` comparisons keep working.
+`DomainTools` and `KYCExceptionAgent` imports are removed. `PendingTaskKind` stays — the client returns real enum members, so the `is` comparisons keep working. Remove the existing `MLFLOW_ENABLED`/`MLFLOW_STATUS` initialization block and its sidebar status line as well: tracing is now initialized by the process that invokes LangGraph (`app.api`) only when `MLFLOW_TRACKING_URI` is configured. This keeps the test suite network-free by default.
 
 - [ ] **Step 2: Replace the agent construction**
 
@@ -960,7 +1036,9 @@ client: KYCClient = st.session_state.client
 
 - [ ] **Step 3: Replace the six agent call sites**
 
-Each change is a rename plus, where noted, an error guard.
+Each change is a rename plus an error guard. `KYCClient` normalizes both API
+errors and `httpx` transport failures into `KYCAPIError`, so no interaction can
+surface an uncaught connection error.
 
 Line 56, case listing:
 
@@ -975,21 +1053,32 @@ except KYCAPIError as exc:
 Line 60, run:
 
 ```python
-    st.session_state.decision = client.run(case_id, planner_mode=planner_choice, lang=lang)
+    try:
+        st.session_state.decision = client.run(case_id, planner_mode=planner_choice, lang=lang)
+    except KYCAPIError as exc:
+        st.error(exc.message)
 ```
 
 Line 68, relocalize:
 
 ```python
-    decision = client.relocalize(decision.decision_id, lang)
+    try:
+        decision = client.relocalize(decision.decision_id, lang)
+    except KYCAPIError as exc:
+        st.error(exc.message)
+        st.stop()
 ```
 
 Lines 121-123, approve:
 
 ```python
-                st.session_state.decision = client.resume(
-                    decision.pending_task.interrupt_key, {"approved": True}, lang=lang
-                )
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key, {"approved": True}, lang=lang
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
 ```
 
 Lines 128-135, reject — the exception type changes, because the empty-reason
@@ -1010,19 +1099,27 @@ rejection now comes back as a 400 from the API rather than a local `ValueError`:
 Lines 140-144, document submission:
 
 ```python
-                st.session_state.decision = client.resume(
-                    decision.pending_task.interrupt_key,
-                    {"documents": [{"type": "proof_of_address", "status": "verified"}]},
-                    lang=lang,
-                )
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key,
+                        {"documents": [{"type": "proof_of_address", "status": "verified"}]},
+                        lang=lang,
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
 ```
 
 Lines 149-151, operational handoff:
 
 ```python
-                st.session_state.decision = client.resume(
-                    decision.pending_task.interrupt_key, {"acknowledged": True}, lang=lang
-                )
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key, {"acknowledged": True}, lang=lang
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
 ```
 
 Everything in the render body (`app/ui.py:70-178`) is untouched.
@@ -1046,7 +1143,7 @@ body reads roughly sixty attributes off the decision, and only a live run
 exercises them.
 
 ```bash
-uv run python -m app.api &
+OPENROUTER_API_KEY=... uv run python -m app.api &
 sleep 3
 KYC_API_URL=http://127.0.0.1:8000 uv run streamlit run app/ui.py
 ```
@@ -1057,7 +1154,7 @@ In the browser, confirm each of these:
 3. An approval case shows the approve/reject buttons; approving advances the workflow status.
 4. Rejecting with an empty reason shows the error message rather than a traceback.
 5. Switching the language selector after a decision re-renders it without re-running the graph.
-6. Stopping the API and clicking Run shows the "agent runtime unreachable" error rather than a traceback.
+6. Stopping the API and triggering a Streamlit rerun (for example, clicking Run) shows a runtime-unavailable error rather than a traceback.
 
 Then stop both processes.
 
@@ -1089,7 +1186,8 @@ Find the section around `README.md:87` that documents `uv run python -m app.serv
 uv run python -m app.api
 ```
 
-Open `http://localhost:8000`. Pick a case, a planner mode, and a language.
+Open `http://localhost:8000`. Pick a case, a planner mode, and a language. The
+`normal` and `compromised_demo` planner modes require `OPENROUTER_API_KEY`.
 
 For durable checkpoints, start Redis Stack first and point the runtime at it:
 
@@ -1106,6 +1204,10 @@ path for the demo.
 indices; a stock Redis build (including Homebrew's) answers `FT._LIST` with
 `unknown command` and the runtime will log a warning and fall back to memory.
 ````
+
+Also update README's repository-tree descriptions from `server.py` to `api.py`
+and from “served by app/server.py” to “served by app/api.py”; otherwise the
+stale-reference check below cannot pass.
 
 - [ ] **Step 2: Update the Streamlit instructions**
 
@@ -1132,20 +1234,28 @@ in-flight approvals. Moving those handles to Redis is the next step, tracked in
 `docs/superpowers/specs/2026-09-19-fastapi-redis-split-design.md`.
 ```
 
-- [ ] **Step 4: Check for stale references**
+- [ ] **Step 4: Correct the MLflow tracing location**
 
-Run: `grep -rn "app.server" README.md docs/`
+Where README describes Streamlit as providing MLflow tracing, update it to say
+that `app.api` initializes best-effort MLflow LangChain autologging because that
+is where the graph now runs. Tracing is opt-in: `MLFLOW_TRACKING_URI` must be
+set, which keeps default startup and the test suite network-free. Keep
+`MLFLOW_EXPERIMENT_NAME` as the optional experiment-name override, but do not
+imply the Streamlit client itself captures agent traces.
 
-Expected: no matches outside the spec's "Context" section, which describes the
-pre-change state and should keep its reference.
+- [ ] **Step 5: Check for stale runnable references**
 
-- [ ] **Step 5: Run the full suite one final time**
+Run: `rg -n "app\.server" README.md`
+
+Expected: no matches.
+
+- [ ] **Step 6: Run the full suite one final time**
 
 Run: `uv run python -m unittest discover -s tests`
 
 Expected: OK, 139 tests.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add README.md
@@ -1162,7 +1272,7 @@ Checked against `docs/superpowers/specs/2026-09-19-fastapi-redis-split-design.md
 |---|---|
 | `app/api.py` routes and lifespan | Task 3 |
 | Request models | Task 3 |
-| Response validation | Task 3 (asserted in `test_successful_response_conforms_to_the_decision_schema`) |
+| Response validation | Task 3 (asserted for decisions, health, and case summaries) |
 | Error contract table | Task 3 (one test per row) |
 | `app/checkpointing.py` | Task 1 |
 | `app/agent.py` changes | Task 2 |
@@ -1173,8 +1283,9 @@ Checked against `docs/superpowers/specs/2026-09-19-fastapi-redis-split-design.md
 | Dependencies | Task 1 |
 | Non-goals stated in code and docs | Task 3 (module docstring), Task 6 (README) |
 
-Test-count arithmetic across tasks: 118 existing − 8 rewritten API tests = 110
-untouched; +4 (Task 1) +2 (Task 2) = 116 before Task 3; +17 (Task 3) = 133;
-+6 (Task 4) = 139. Each task's expected count above follows this progression.
+Test-count arithmetic across tasks: 118 existing − 10 migrated stdlib HTTP
+tests = 108 untouched; +4 (Task 1) +2 (Task 2) = 114 before Task 3; +18
+(Task 3) = 132; +7 (Task 4) = 139. Each task's expected count above follows
+this progression.
 If a count is off after a task, reconcile before continuing rather than
 adjusting the next task's expectation.

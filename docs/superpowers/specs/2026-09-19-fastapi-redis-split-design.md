@@ -33,9 +33,11 @@ Redis checkpointer with an in-memory fallback.
 1. One agent runtime, reachable over HTTP, with Streamlit as a client of it.
 2. Declarative request validation and validated responses on every route.
 3. Durable LangGraph checkpoints in Redis, degrading cleanly when Redis is absent.
-4. The suite stays green. 110 of the 118 current tests are untouched; the 8 in
-   `tests/test_workflow_api.py` are replaced by equivalents asserting the same
-   behavior through `TestClient`, and the new files add to the total.
+4. The suite stays green. Tasks 1–2 retain all 118 current tests; Task 3 replaces
+   the 8 in `tests/test_workflow_api.py` and the 2 stdlib-handler tests in
+   `tests/test_agent.py` with equivalents asserting the same behavior through
+   `TestClient`. The other 108 tests are untouched, and the new files add to the
+   total.
 
 ## Non-Goals
 
@@ -86,7 +88,7 @@ A FastAPI application exposing the existing contract:
 
 | Method | Path               | Request model       | Response         |
 |--------|--------------------|---------------------|------------------|
-| GET    | `/health`          | —                   | `{"status", "checkpointer"}` |
+| GET    | `/health`          | —                   | `HealthResponse` |
 | GET    | `/api/cases`       | —                   | `list[CaseSummary]` |
 | GET    | `/`, `/index.html` | —                   | `static/index.html` |
 | POST   | `/api/run`         | `RunRequest`        | `AgentDecision`  |
@@ -95,8 +97,10 @@ A FastAPI application exposing the existing contract:
 | POST   | `/api/reject`      | `RejectRequest`     | `AgentDecision`  |
 | POST   | `/api/relocalize`  | `RelocalizeRequest` | `AgentDecision`  |
 
-`CaseSummary` is a model over what `DomainTools.list_cases` already returns:
-`case_id`, `title`, `signal`.
+`HealthResponse` has `status` and `checkpointer`. `CaseSummary` is a model over
+what `DomainTools.list_cases` already returns: `case_id`, `title`, `signal`.
+Both GET routes declare these response models, so every JSON route has a
+validated response contract; the static-file routes are intentionally excluded.
 
 `/health` reports which checkpointer backend is live, so a deployment can tell
 durable from degraded without reading logs.
@@ -115,7 +119,8 @@ PlannerMode = Literal["normal", "compromised_demo"]
 
 class RunRequest(BaseModel):
     case_id: str = Field(min_length=1)
-    planner_mode: PlannerMode = "normal"
+    # None means the key was omitted, allowing legacy `planner` to select mode.
+    planner_mode: PlannerMode | None = None
     planner: str | None = None          # legacy field, still accepted
     lang: str = "en"
 
@@ -218,8 +223,9 @@ class KYCClient:
 ```
 
 Built on `httpx.Client`. A non-2xx response raises `KYCAPIError(status, message)`
-carrying the parsed `{"error": ...}` message, so the UI can render a real reason
-rather than a stack trace.
+carrying the parsed `{"error": ...}` message. Transport failures are normalized
+to `KYCAPIError(None, message)` as well, so the UI can render a real reason rather
+than a stack trace when the runtime is unavailable.
 
 **The client rehydrates responses into `AgentDecision`** via
 `TypeAdapter(AgentDecision).validate_python(...)`, rather than returning raw
@@ -235,17 +241,28 @@ the dependency over `response.json()`.
 
 Drops `from app.agent import KYCExceptionAgent` and its `DomainTools()`
 construction. `st.session_state.client = KYCClient(os.environ.get("KYC_API_URL",
-"http://127.0.0.1:8000"))` replaces `st.session_state.agent`. Each of the seven
-call sites (`agent.run`, `agent.relocalize`, and the five `agent.resume` calls at
+"http://127.0.0.1:8000"))` replaces `st.session_state.agent`. Each of the six
+call sites (`agent.run`, `agent.relocalize`, and the four `agent.resume` calls at
 `app/ui.py:121-149`) becomes the corresponding client method.
 
 Because the client returns `AgentDecision`, every attribute read in the render
 body — roughly sixty sites across `app/ui.py:70-178` — is untouched. The change
-is confined to the construction block and those seven call sites.
+is confined to the construction block and those six call sites.
 
 The one behavioral difference: `agent.resume` raised `ValueError` for an empty
 rejection reason, caught at `app/ui.py:134`. The client raises `KYCAPIError`
 instead, so that handler changes accordingly.
+
+Every UI client call handles `KYCAPIError`, including the initially loaded case
+list and transport failures, so stopping the runtime produces a visible error
+instead of a Streamlit traceback.
+
+MLflow setup moves from Streamlit to the API lifespan. The Streamlit process no
+longer invokes LangGraph, so leaving `mlflow.langchain.autolog()` there would
+silently stop capturing agent traces. The runtime enables best-effort tracing
+only when `MLFLOW_TRACKING_URI` is configured (with
+`MLFLOW_EXPERIMENT_NAME` as an optional override), which prevents default test
+and demo startup from making a network call.
 
 The UI is still exercised manually against a running API before the work is
 called done.
@@ -254,10 +271,10 @@ called done.
 
 | File | Coverage |
 |------|----------|
-| `tests/test_workflow_api.py` (rewritten) | Same cases as today, via `TestClient`: missing field → 400, non-object `response` → 400, unknown planner mode → 400, non-string legacy planner → 400, array JSON body → 400, stale interrupt key → 404, missing live key → client-visible config error. Plus: `extra="forbid"` rejection, and every 2xx body conforming to the `AgentDecision` response model. |
+| `tests/test_workflow_api.py` (rewritten) | Same cases as today, via lifespan-managed `TestClient`: missing field → 400, non-object `response` → 400, unknown planner mode → 400, non-string legacy planner → 400, array JSON body → 400, stale interrupt key → 404, missing live key → client-visible config error, unknown case → 404, and rejection reason forwarding. Plus: `extra="forbid"` rejection, validated health/case-list responses, and every decision body conforming to the `AgentDecision` response model. |
 | `tests/test_checkpointing.py` (new) | `REDIS_URL` unset → `MemorySaver`, backend `"memory"`. `REDIS_URL` set but unreachable → `MemorySaver`, backend `"memory (degraded)"`, warning emitted. No live Redis required. |
-| `tests/test_client.py` (new) | Each method hits the right path with the right body, against a mocked `httpx` transport. `{"error": ...}` bodies raise `KYCAPIError` carrying status and message. |
-| Existing 118 tests | Must stay green. `tests/test_agent.py` and the workflow tests construct agents directly and are unaffected by the default-`None` checkpointer. |
+| `tests/test_client.py` (new) | Each method hits the right path with the right body, against a mocked `httpx` transport. `{"error": ...}` bodies and transport failures raise `KYCAPIError` carrying status (or `None`) and message. |
+| Existing 118 tests | Must stay green. The 10 stdlib HTTP tests are migrated to `tests/test_workflow_api.py`; all other tests remain unaffected by the default-`None` checkpointer. |
 
 Redis-backed persistence is verified manually against `redis-stack-server`, not
 in the automated suite — the suite must stay runnable with no infrastructure.
@@ -286,7 +303,10 @@ KYC_API_URL=http://127.0.0.1:8000 uv run streamlit run app/ui.py
 ```
 
 Omitting `REDIS_URL` runs in-memory, which is the intended zero-infrastructure
-path for the interview demo.
+path for the interview demo. The runtime and static UI start without an
+OpenRouter credential, but running either live planner mode still requires
+`OPENROUTER_API_KEY`; use the legacy heuristic planner only for deterministic
+API smoke checks.
 
 ## Dependencies
 
