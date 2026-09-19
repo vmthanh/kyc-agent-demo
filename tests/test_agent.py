@@ -5,6 +5,8 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
+from langgraph.checkpoint.memory import MemorySaver
+
 from app import i18n
 from app.agent import KYCExceptionAgent
 from app.domain import LLMProposal, Outcome
@@ -451,6 +453,21 @@ class I18nTests(unittest.TestCase):
     def test_translate_via_llm_returns_none_without_credentials(self) -> None:
         with patch("app.i18n.os.getenv", return_value=""):
             self.assertIsNone(i18n.translate_via_llm("hello", "vi"))
+
+
+class AgentCheckpointerTests(unittest.TestCase):
+    def test_checkpointer_reaches_the_compiled_graph(self) -> None:
+        saver = MemorySaver()
+        agent = KYCExceptionAgent(checkpointer=saver)
+        with patch("app.agent.build_workflow_graph") as build:
+            agent._graph_for("normal", None)
+        self.assertIs(build.call_args.kwargs["checkpointer"], saver)
+
+    def test_default_agent_passes_no_checkpointer(self) -> None:
+        agent = KYCExceptionAgent()
+        with patch("app.agent.build_workflow_graph") as build:
+            agent._graph_for("normal", None)
+        self.assertIsNone(build.call_args.kwargs["checkpointer"])
 
 
 if __name__ == "__main__":

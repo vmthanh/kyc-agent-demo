@@ -18,8 +18,9 @@ ONTOLOGY_PATH = ["Customer", "KYCApplication", "Evidence", "RiskFinding", "Polic
 
 
 class KYCExceptionAgent:
-    def __init__(self, tools: DomainTools | None = None) -> None:
+    def __init__(self, tools: DomainTools | None = None, checkpointer: Any | None = None) -> None:
         self.tools = tools or DomainTools()
+        self.checkpointer = checkpointer
         self._graphs: dict[str, Any] = {}
         self._pending_tasks: dict[str, dict[str, Any]] = {}
         self._results: dict[str, dict[str, Any]] = {}
@@ -31,7 +32,9 @@ class KYCExceptionAgent:
         else:
             key, resolved = planner_name or "auto", select_planner(planner_name)
         if key not in self._graphs:
-            self._graphs[key] = build_workflow_graph(self.tools, resolved)
+            self._graphs[key] = build_workflow_graph(
+                self.tools, resolved, checkpointer=self.checkpointer
+            )
         return self._graphs[key]
 
     def run(
