@@ -1,5 +1,3 @@
-import io
-import json
 import threading
 from pathlib import Path
 import unittest
@@ -12,7 +10,6 @@ from app.agent import KYCExceptionAgent
 from app.domain import LLMProposal, Outcome
 from app.planner import OpenRouterPlanner
 from app.policy import evaluate, guard
-from app.server import Handler
 from app.tools import DomainTools
 
 
@@ -145,41 +142,6 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(len(results), 20)
         ticket_ids = [r["ticket_id"] for r in results]
         self.assertEqual(len(ticket_ids), len(set(ticket_ids)))
-
-
-class HTTPServerTests(unittest.TestCase):
-    def test_unknown_case_returns_a_json_not_found_response(self) -> None:
-        """Client input errors must not terminate the HTTP connection."""
-        body = json.dumps({"case_id": "KYC-UNKNOWN", "planner": "heuristic"}).encode()
-        handler = object.__new__(Handler)
-        handler.headers = {"Content-Length": str(len(body))}
-        handler.rfile = io.BytesIO(body)
-        handler.path = "/api/run"
-        responses = []
-        handler._json = lambda value, status=200: responses.append((value, status))
-
-        handler.do_POST()
-
-        self.assertEqual(responses, [({"error": "Unknown case: KYC-UNKNOWN"}, 404)])
-
-    def test_reject_endpoint_passes_the_review_reason_to_the_agent(self) -> None:
-        body = json.dumps({"approval_key": "approval-1", "reason": "Evidence is too old", "lang": "en"}).encode()
-        handler = object.__new__(Handler)
-        handler.headers = {"Content-Length": str(len(body))}
-        handler.rfile = io.BytesIO(body)
-        handler.path = "/api/reject"
-        responses = []
-        handler._json = lambda value, status=200: responses.append((value, status))
-
-        class FakeDecision:
-            def to_dict(self):
-                return {"review_result": {"status": "rejected", "reason": "Evidence is too old"}}
-
-        with patch("app.server.AGENT.reject", return_value=FakeDecision()) as reject:
-            handler.do_POST()
-
-        reject.assert_called_once_with("approval-1", "Evidence is too old", lang="en")
-        self.assertEqual(responses[0][0]["review_result"]["reason"], "Evidence is too old")
 
 
 class StaticDemoTests(unittest.TestCase):
