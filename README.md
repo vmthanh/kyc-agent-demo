@@ -54,7 +54,7 @@ app/
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
   agent.py       KYCExceptionAgent façade over the fan-out/fan-in workflow
-  server.py      primary demo: zero-dependency HTTP API + static UI
+  api.py         primary demo: FastAPI HTTP API + static UI
   ui.py          optional rich demo: Streamlit, native interrupt/resume, MLflow tracing
   cli.py         terminal demo
 data/
@@ -64,7 +64,7 @@ data/
 evals/
   run_evals.py   deterministic eval doubles + guardrail, route, and rendering regressions
 static/
-  index.html     demo UI served by app/server.py
+  index.html     demo UI served by app/api.py
 tests/
   test_agent.py  policy unit tests, tool idempotency, end-to-end graph tests, i18n tests, mocked-LLM adapter test
 docs/
@@ -84,12 +84,35 @@ opt-in smoke command checks that provider connection.
 cp .env.example .env
 # set OPENROUTER_API_KEY
 uv sync
-uv run python -m app.server
+# agent runtime (single replica)
+uv run python -m app.api
 ```
 
-Open `http://localhost:8000`. Pick a case, a planner mode, and a language,
-then click **Run agent**. Try `KYC-1044` with `compromised_demo` to see the
-live OpenRouter proposal meet the deterministic guardrail.
+Open `http://localhost:8000`. Pick a case, a planner mode, and a language. The
+`normal` and `compromised_demo` planner modes require `OPENROUTER_API_KEY`.
+
+For durable checkpoints, start Redis Stack first and point the runtime at it:
+
+```bash
+docker run -d --name kyc-redis -p 6379:6379 redis/redis-stack-server:latest
+REDIS_URL=redis://localhost:6379 uv run python -m app.api
+```
+
+`GET /health` reports which checkpointer is live. Without `REDIS_URL` the
+runtime uses in-memory checkpoints, which is the intended zero-infrastructure
+path for the demo.
+
+**Redis Stack is required, not plain Redis.** `RedisSaver` builds RediSearch
+indices; a stock Redis build (including Homebrew's) answers `FT._LIST` with
+`unknown command` and the runtime will log a warning and fall back to memory.
+
+### Scale boundary
+
+The runtime holds pending-approval handles in process memory, so it runs as a
+**single replica**. Redis makes graph state durable across a restart; it does
+not make the service horizontally scalable, and a restart still orphans
+in-flight approvals. Moving those handles to Redis is the next step, tracked in
+`docs/superpowers/specs/2026-09-19-fastapi-redis-split-design.md`.
 
 ## Run the CLI demo
 
@@ -161,7 +184,8 @@ must print `200`.
 Terminal 2 -- the app:
 
 ```bash
-uv run streamlit run app/ui.py
+# with the runtime from the previous section already running
+KYC_API_URL=http://127.0.0.1:8000 uv run streamlit run app/ui.py
 ```
 
 `.runtime/` is gitignored and holds MLflow's sqlite store explicitly,
@@ -173,7 +197,10 @@ to write a readonly database` on every later trace write, even though the
 file itself looks fine once recreated. To reset cleanly: Ctrl-C the
 server, `rm -rf .runtime/mlflow`, `mkdir -p .runtime/mlflow` again, restart.
 
-**Known nonfatal warning:** `mlflow.langchain.autolog()` logs `Error in
+`app.api` initializes best-effort MLflow LangChain autologging when
+`MLFLOW_TRACKING_URI` is set, which keeps default startup and the test suite
+network-free. Tracing is opt-in: `MLFLOW_EXPERIMENT_NAME` can be used to
+override the experiment name. **Known nonfatal warning:** `mlflow.langchain.autolog()` logs `Error in
 MlflowLangchainTracer.on_interrupt callback: AttributeError(...)` when the
 graph pauses on a LangGraph `interrupt()` -- this mlflow version's tracer
 doesn't implement that callback yet, so that callback's data is lost, but
