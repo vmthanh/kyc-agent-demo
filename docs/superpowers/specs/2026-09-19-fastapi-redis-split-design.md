@@ -156,12 +156,11 @@ Routes declare `response_model=AgentDecision`. FastAPI converts stdlib
 dataclasses to Pydantic models natively, so the response schema derives from
 `app/domain.py` with no parallel model tree to drift out of sync.
 
-This conversion must be **verified before the rest of the API is built on it**,
-specifically that `Outcome` and `WorkflowStatus` (both `str, Enum`) serialize to
-their values, matching today's manual conversion in `AgentDecision.to_dict`.
-If verification fails, fall back to `response_model=None` plus an explicit
-`TypeAdapter(AgentDecision).validate_python(...)` call in each route — still one
-source of truth, just validated manually.
+Verified on this codebase before planning: the serialized body's key set is
+exactly `AgentDecision.__dataclass_fields__`, and `Outcome`, `WorkflowStatus`
+and `PendingTaskKind` all serialize to their string values — matching today's
+manual conversion in `AgentDecision.to_dict` byte for byte. No compatibility
+shim is needed.
 
 ### Error contract (unchanged from `server.py`)
 
@@ -211,16 +210,26 @@ stored and passed through `_graph_for` into `build_workflow_graph`. Default
 class KYCClient:
     def __init__(self, base_url: str, timeout: float = 60.0) -> None: ...
     def list_cases(self) -> list[dict[str, Any]]: ...
-    def run(self, case_id, planner_mode="normal", lang="en") -> dict[str, Any]: ...
-    def resume(self, interrupt_key, response, lang=None) -> dict[str, Any]: ...
-    def approve(self, approval_key, lang=None) -> dict[str, Any]: ...
-    def reject(self, approval_key, reason, lang=None) -> dict[str, Any]: ...
-    def relocalize(self, decision_id, lang) -> dict[str, Any]: ...
+    def run(self, case_id, planner_mode="normal", lang="en") -> AgentDecision: ...
+    def resume(self, interrupt_key, response, lang=None) -> AgentDecision: ...
+    def approve(self, approval_key, lang=None) -> AgentDecision: ...
+    def reject(self, approval_key, reason, lang=None) -> AgentDecision: ...
+    def relocalize(self, decision_id, lang) -> AgentDecision: ...
 ```
 
 Built on `httpx.Client`. A non-2xx response raises `KYCAPIError(status, message)`
 carrying the parsed `{"error": ...}` message, so the UI can render a real reason
 rather than a stack trace.
+
+**The client rehydrates responses into `AgentDecision`** via
+`TypeAdapter(AgentDecision).validate_python(...)`, rather than returning raw
+dicts. Verified on this codebase: the roundtrip restores nested dataclasses and
+returns real enum members, so `decision.pending_task.kind is
+PendingTaskKind.ACTION_APPROVAL` and `decision.workflow_status.value` keep
+working unchanged.
+
+This is what makes the UI migration small, and it is why `TypeAdapter` is worth
+the dependency over `response.json()`.
 
 ### `app/ui.py` changes
 
@@ -230,10 +239,16 @@ construction. `st.session_state.client = KYCClient(os.environ.get("KYC_API_URL",
 call sites (`agent.run`, `agent.relocalize`, and the five `agent.resume` calls at
 `app/ui.py:121-149`) becomes the corresponding client method.
 
-Because the API returns JSON rather than an `AgentDecision` object, the UI reads
-dict keys instead of attributes. This is the largest mechanical change in the
-work and is where regressions are most likely, so the UI is exercised manually
-against a running API before the work is called done.
+Because the client returns `AgentDecision`, every attribute read in the render
+body — roughly sixty sites across `app/ui.py:70-178` — is untouched. The change
+is confined to the construction block and those seven call sites.
+
+The one behavioral difference: `agent.resume` raised `ValueError` for an empty
+rejection reason, caught at `app/ui.py:134`. The client raises `KYCAPIError`
+instead, so that handler changes accordingly.
+
+The UI is still exercised manually against a running API before the work is
+called done.
 
 ## Testing
 
