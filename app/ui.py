@@ -1,11 +1,12 @@
-"""Streamlit surface: shows LangGraph's native interrupt/resume approval flow
-and (optionally) MLflow tracing, backed by the same `KYCExceptionAgent` used
-by the CLI and the zero-dependency HTTP demo in `app/server.py`.
+"""Streamlit frontend for the KYC exception agent.
 
-One agent is kept for the whole session (not one per planner choice): the
-planner and the display language are arguments to `run()`/`approve()`, so
-switching either between a run and its approval can never target a stale or
-wrong graph (see `agent.py`'s docstring)."""
+Talks to the agent runtime in `app.api` over HTTP rather than constructing an
+agent in-process. Before this split each browser session built its own
+`KYCExceptionAgent` with its own checkpointer, so two tabs could not see each
+other's pending approvals.
+
+Set `KYC_API_URL` if the runtime is not on http://127.0.0.1:8000.
+"""
 import os
 import sys
 from pathlib import Path
@@ -16,36 +17,19 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import i18n
-from app.agent import KYCExceptionAgent
+from app.client import KYCAPIError, KYCClient
 from app.domain import PendingTaskKind
-from app.tools import DomainTools
 
 st.set_page_config(page_title="KYC Exception Agent / Tác Tử Xử Lý KYC", layout="wide")
 
-MLFLOW_ENABLED = False
-try:
-    import mlflow
-
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5001"))
-    mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", "kyc-exception-agent-demo"))
-    mlflow.langchain.autolog()
-    MLFLOW_ENABLED = True
-except Exception as exc:  # pragma: no cover - best-effort tracing only
-    MLFLOW_STATUS = f"MLflow tracing disabled: {exc}"
-else:
-    MLFLOW_STATUS = f"MLflow tracing active -> {os.getenv('MLFLOW_TRACKING_URI', 'http://127.0.0.1:5001')}"
-
-if "tools" not in st.session_state:
-    st.session_state.tools = DomainTools()
-if "agent" not in st.session_state:
-    st.session_state.agent = KYCExceptionAgent(tools=st.session_state.tools)
-agent: KYCExceptionAgent = st.session_state.agent
+if "client" not in st.session_state:
+    st.session_state.client = KYCClient(os.environ.get("KYC_API_URL", "http://127.0.0.1:8000"))
+client: KYCClient = st.session_state.client
 
 lang = st.sidebar.selectbox("Language / Ngôn ngữ", ["en", "vi"], format_func=lambda l: {"en": "English", "vi": "Tiếng Việt"}[l])
 
 st.title(i18n.ui_text(lang, "title"))
 st.caption(i18n.ui_text(lang, "subtitle"))
-st.sidebar.info(MLFLOW_STATUS if MLFLOW_ENABLED else f":warning: {MLFLOW_STATUS}")
 
 planner_choice = st.sidebar.selectbox(
     i18n.ui_text(lang, "planner_label"),
@@ -53,11 +37,18 @@ planner_choice = st.sidebar.selectbox(
     format_func=lambda mode: i18n.ui_text(lang, "planner_normal") if mode == "normal" else i18n.ui_text(lang, "planner_compromised"),
     help=i18n.ui_text(lang, "planner_help"),
 )
-cases = st.session_state.tools.list_cases()
+try:
+    cases = client.list_cases()
+except KYCAPIError as exc:
+    st.error(f"{i18n.ui_text(lang, 'title')}: agent runtime unreachable ({exc}).")
+    st.stop()
 case_id = st.selectbox(i18n.ui_text(lang, "case_label"), [c["case_id"] for c in cases], format_func=lambda cid: cid)
 
 if st.button(i18n.ui_text(lang, "run"), type="primary"):
-    st.session_state.decision = agent.run(case_id, planner_mode=planner_choice, lang=lang)
+    try:
+        st.session_state.decision = client.run(case_id, planner_mode=planner_choice, lang=lang)
+    except KYCAPIError as exc:
+        st.error(exc.message)
 
 decision = st.session_state.get("decision")
 if decision is not None and decision.lang != lang:
@@ -65,7 +56,11 @@ if decision is not None and decision.lang != lang:
     # re-render that same decision, don't silently leave stale English (or
     # Vietnamese) content on screen and don't re-run the graph (which would
     # lose an in-flight approval and duplicate tool calls).
-    decision = agent.relocalize(decision.decision_id, lang)
+    try:
+        decision = client.relocalize(decision.decision_id, lang)
+    except KYCAPIError as exc:
+        st.error(exc.message)
+        st.stop()
     st.session_state.decision = decision
 if decision is not None:
     left, right = st.columns([2, 1])
@@ -118,38 +113,47 @@ if decision is not None:
             st.caption(f"Pending case: {decision.case_id}")
             st.json(decision.approval.payload.get("action_payload", decision.approval.payload))
             if st.button(i18n.ui_text(lang, "approve_button")):
-                st.session_state.decision = agent.resume(
-                    decision.pending_task.interrupt_key, {"approved": True}, lang=lang
-                )
-                st.rerun()
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key, {"approved": True}, lang=lang
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
             rejection_reason = st.text_input(i18n.ui_text(lang, "reject_reason"), key=f"reject-{decision.decision_id}")
             if st.button(i18n.ui_text(lang, "reject_button")):
                 try:
-                    st.session_state.decision = agent.resume(
+                    st.session_state.decision = client.resume(
                         decision.pending_task.interrupt_key,
                         {"approved": False, "reason": rejection_reason},
                         lang=lang,
                     )
                     st.rerun()
-                except ValueError as exc:
-                    st.error(str(exc))
+                except KYCAPIError as exc:
+                    st.error(exc.message)
         elif decision.pending_task and decision.pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION:
             st.warning(i18n.ui_text(lang, "pending_document_submission"))
             st.json(decision.pending_task.payload.get("requested_documents", []))
             if st.button(i18n.ui_text(lang, "submit_documents")):
-                st.session_state.decision = agent.resume(
-                    decision.pending_task.interrupt_key,
-                    {"documents": [{"type": "proof_of_address", "status": "verified"}]},
-                    lang=lang,
-                )
-                st.rerun()
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key,
+                        {"documents": [{"type": "proof_of_address", "status": "verified"}]},
+                        lang=lang,
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
         elif decision.pending_task and decision.pending_task.kind is PendingTaskKind.OPERATIONAL_REVIEW:
             st.warning(i18n.ui_text(lang, "operational_handoff"))
             if st.button(i18n.ui_text(lang, "acknowledge_handoff")):
-                st.session_state.decision = agent.resume(
-                    decision.pending_task.interrupt_key, {"acknowledged": True}, lang=lang
-                )
-                st.rerun()
+                try:
+                    st.session_state.decision = client.resume(
+                        decision.pending_task.interrupt_key, {"acknowledged": True}, lang=lang
+                    )
+                    st.rerun()
+                except KYCAPIError as exc:
+                    st.error(exc.message)
         if decision.executed_action:
             st.success(
                 f"{i18n.ui_text(lang, 'action_executed')}: {decision.executed_action['action']} -> "

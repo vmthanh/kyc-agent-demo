@@ -10,7 +10,7 @@ class WorkflowSurfaceTests(unittest.TestCase):
         source = (ROOT / "app" / "ui.py").read_text()
         self.assertIn('"normal", "compromised_demo"', source)
         self.assertIn("PendingTaskKind.DOCUMENT_SUBMISSION", source)
-        self.assertIn("agent.resume", source)
+        self.assertIn("client.resume", source)
 
     def test_cli_can_complete_the_evidence_demo_in_one_process(self) -> None:
         source = (ROOT / "app" / "cli.py").read_text()
