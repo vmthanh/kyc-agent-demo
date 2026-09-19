@@ -10,6 +10,7 @@ import logging
 import os
 from contextlib import ExitStack
 from typing import Any
+from urllib.parse import urlsplit
 
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -39,12 +40,17 @@ def make_checkpointer(stack: ExitStack, redis_url: str | None = None) -> tuple[A
         saver.setup()
         return saver, REDIS
     except Exception as exc:
+        # Log only host:port, never the raw URL or exception body -- both can
+        # carry the REDIS_URL's embedded credentials (redis://user:pass@host).
+        parsed = urlsplit(url)
+        safe_host = parsed.hostname or "?"
+        if parsed.port:
+            safe_host = f"{safe_host}:{parsed.port}"
         logger.warning(
-            "REDIS_URL=%s is set but unusable (%s: %s). Falling back to in-memory "
+            "REDIS_URL host %s is set but unusable (%s). Falling back to in-memory "
             "checkpoints -- graph state will NOT survive a restart. Redis Stack is "
             "required; plain Redis without RediSearch cannot back RedisSaver.",
-            url,
+            safe_host,
             type(exc).__name__,
-            exc,
         )
         return MemorySaver(), MEMORY_DEGRADED
