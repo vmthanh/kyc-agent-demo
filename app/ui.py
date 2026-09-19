@@ -60,6 +60,7 @@ if decision is not None and decision.lang != lang:
         decision = client.relocalize(decision.decision_id, lang)
     except KYCAPIError as exc:
         st.error(exc.message)
+        st.session_state.decision = None
         st.stop()
     st.session_state.decision = decision
 if decision is not None:

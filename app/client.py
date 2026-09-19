@@ -28,9 +28,9 @@ class KYCAPIError(RuntimeError):
 
 
 class KYCClient:
-    def __init__(self, base_url: str, timeout: float = 60.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 60.0, transport: httpx.BaseTransport | None = None) -> None:
         self.base_url = base_url.rstrip("/")
-        self._http = httpx.Client(base_url=self.base_url, timeout=timeout)
+        self._http = httpx.Client(base_url=self.base_url, timeout=timeout, transport=transport)
 
     def close(self) -> None:
         self._http.close()

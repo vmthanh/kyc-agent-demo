@@ -145,7 +145,7 @@ async def _on_key_error(request: Request, exc: KeyError) -> JSONResponse:
     # A stale interrupt handle is a 404 so a stale UI action reads correctly;
     # a missing request field is a 400. Behavior preserved from server.py.
     message = str(exc).strip("'")
-    if message.lower().startswith("unknown or already resolved"):
+    if message.lower().startswith(("unknown or already resolved", "unknown or expired")):
         return _error(message, 404)
     return _error(f"Unknown or missing field: {exc}", 400)
 

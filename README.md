@@ -169,8 +169,7 @@ Three deliberate, verified choices here:
   can resolve to that listener (403, since it rejects non-AirPlay
   requests) while `127.0.0.1` reaches the mlflow server we actually
   started (200) -- deterministic, address-dependent, not random. Port
-  5001 sidesteps the collision entirely; `.env.example` and `app/ui.py`
-  both default to it.
+  5001 sidesteps the collision entirely; the tracking URI is read from `.env.example` by `app.api`.
 - **`--host 127.0.0.1` explicit, and use `127.0.0.1` (not `localhost`) in
   `MLFLOW_TRACKING_URI`.** Same reason: `localhost` may resolve to a
   different listener than the one the server actually bound.

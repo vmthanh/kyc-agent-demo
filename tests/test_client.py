@@ -33,10 +33,7 @@ def a_decision_body() -> dict:
 
 class KYCClientTests(unittest.TestCase):
     def client(self, handler) -> KYCClient:
-        client = KYCClient("http://testserver")
-        client._http = httpx.Client(
-            base_url="http://testserver", transport=httpx.MockTransport(handler)
-        )
+        client = KYCClient("http://testserver", transport=httpx.MockTransport(handler))
         self.addCleanup(client.close)
         return client
 
