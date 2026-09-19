@@ -12,3 +12,5 @@ mlflow.db
 *.pptx
 *.pdf
 slides/.export/
+.playwright-mcp/
+.superpowers/

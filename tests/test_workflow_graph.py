@@ -145,6 +145,16 @@ class WorkflowGraphTests(unittest.TestCase):
         done = agent.resume(key, {"acknowledged": True})
         self.assertEqual(done.workflow_status, WorkflowStatus.COMPLETED)
 
+    def test_repeated_invalid_resubmissions_hand_off_after_attempt_cap(self):
+        agent = KYCExceptionAgent()
+        first = agent.run("KYC-1042", planner=HeuristicPlanner())
+        key = first.pending_task.interrupt_key
+        submission = agent.approve(key)
+        for _ in range(3):
+            submission = agent.resume(submission.pending_task.interrupt_key, {"documents": []})
+        self.assertEqual(submission.pending_task.kind, PendingTaskKind.OPERATIONAL_REVIEW)
+        self.assertIn("resubmission", submission.summary.lower())
+
     def test_recovered_grounding_trace_records_retry_attempt(self):
         tools = RecoveringGroundingTools()
         result = KYCExceptionAgent(tools=tools).run("KYC-1045", planner=HeuristicPlanner())

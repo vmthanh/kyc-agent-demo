@@ -18,6 +18,10 @@ class WorkflowState(TypedDict, total=False):
     max_cycles: int
     submitted_documents: list[dict[str, Any]]
     submission_valid: bool
+    submission_attempts: int
+    submission_exhausted: bool
+    evidence_ok: bool | None
+    final_outcome: Literal["COMPLETED", "BLOCKED", "REJECTED"] | None
     customer_facts: dict[str, Any] | None
     document_facts: dict[str, Any] | None
     screening_facts: dict[str, Any] | None
@@ -61,6 +65,8 @@ def initial_state(
         "cycle_count": 1,
         "max_cycles": max_cycles,
         "submitted_documents": [],
+        "submission_attempts": 0,
+        "submission_exhausted": False,
         "tool_calls": [],
         "tool_errors": [],
         "trace": [],

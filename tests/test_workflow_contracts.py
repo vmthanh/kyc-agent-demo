@@ -17,7 +17,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(task.to_dict()["kind"], "document_submission")
 
     def test_every_safe_failure_reason_renders_in_both_languages(self) -> None:
-        for key in ("ai_unavailable", "tool_unavailable", "policy_unavailable", "cycle_exhausted"):
+        for key in ("ai_unavailable", "tool_unavailable", "policy_unavailable", "cycle_exhausted", "submission_attempts_exhausted"):
             self.assertTrue(i18n.render_reason(key, {}, "en"))
             self.assertTrue(i18n.render_reason(key, {}, "vi"))
 

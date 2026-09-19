@@ -212,6 +212,10 @@ REASON_TEMPLATES: dict[str, dict[str, str]] = {
         "en": "Required evidence is still incomplete after the maximum evaluation cycles; manual review is required.",
         "vi": "Hồ sơ vẫn chưa đầy đủ sau số vòng đánh giá tối đa; cần rà soát thủ công.",
     },
+    "submission_attempts_exhausted": {
+        "en": "The maximum number of document resubmission attempts was reached without a valid submission; manual review is required.",
+        "vi": "Đã đạt số lần bổ sung tài liệu tối đa mà vẫn chưa hợp lệ; cần rà soát thủ công.",
+    },
 }
 
 

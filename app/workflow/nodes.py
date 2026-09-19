@@ -6,13 +6,14 @@ fact field and append-only fields contribute only their own reducer value.
 """
 from __future__ import annotations
 
+import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from langgraph.types import interrupt
 
 from ..domain import LLMProposal, Outcome, PolicyCitation
-from ..planner import Planner
+from ..planner import Planner, PlannerUnavailableError
 from ..policy import PolicyVerdict, evaluate, guard_verdict, tags_for
 from ..tools import DomainTools, action_idempotency_key
 from .state import WorkflowState
@@ -24,6 +25,16 @@ REQUIRED_POLICY_BY_REASON = {
     "missing_evidence": "KYC-EVIDENCE-07",
     "clear": "KYC-CLEAR-01",
 }
+
+# The LLM node fails closed on its own (see `openrouter_reason`); it never
+# raises past this module, so no LangGraph retry_policy/error_handler is
+# wired for it at the graph level.
+PLANNER_MAX_ATTEMPTS = 3
+PLANNER_INITIAL_INTERVAL = 0.5
+PLANNER_BACKOFF_FACTOR = 2.0
+PLANNER_MAX_INTERVAL = 2.0
+
+MAX_SUBMISSION_ATTEMPTS = 3
 
 
 @dataclass(frozen=True)
@@ -138,10 +149,12 @@ class WorkflowNodes:
         }
         if any(value is None for value in fields.values()):
             return {
+                "evidence_ok": False,
                 "operational_reason": "tool_unavailable",
                 "trace": [self._event(state, "evidence_gate", "Evidence incomplete", "Authoritative grounding is unavailable", "degraded", runtime)],
             }
         return {
+            "evidence_ok": True,
             "facts": fields,
             "trace": [self._event(state, "evidence_gate", "Evidence complete", "Joined four authoritative fact sources", runtime=runtime)],
         }
@@ -181,19 +194,38 @@ class WorkflowNodes:
         }
 
     def openrouter_reason(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        """Fail closed on its own: retries transient planner outages in-node and
+        never raises, so `reconcile_guard` can fold an unavailable model into the
+        deterministic verdict without a dedicated error-routing node."""
         citations = [PolicyCitation(**citation) for citation in state.get("citations", [])]
-        proposal = self.planner.propose(
-            state["case_id"], state["facts"], citations, self.tools.get_case_note(state["case_id"]),
-        )
-        attempt = self._attempt(runtime)
+        last_error: BaseException | None = None
+        for attempt in range(1, PLANNER_MAX_ATTEMPTS + 1):
+            try:
+                proposal = self.planner.propose(
+                    state["case_id"], state["facts"], citations, self.tools.get_case_note(state["case_id"]),
+                )
+                return {
+                    "proposal": asdict(proposal),
+                    "planner_status": "ok",
+                    "planner_attempts": attempt,
+                    "trace": [self._event(state, "openrouter_reason", f"Planner proposal ({proposal.model})", proposal.outcome, runtime=runtime)],
+                }
+            except PlannerUnavailableError as exc:
+                last_error = exc
+                if attempt < PLANNER_MAX_ATTEMPTS:
+                    delay = min(PLANNER_MAX_INTERVAL, PLANNER_INITIAL_INTERVAL * (PLANNER_BACKOFF_FACTOR ** (attempt - 1)))
+                    if delay:
+                        time.sleep(delay)
         return {
-            "proposal": asdict(proposal),
-            "planner_status": "ok",
-            "planner_attempts": attempt,
-            "trace": [self._event(state, "openrouter_reason", f"Planner proposal ({proposal.model})", proposal.outcome, runtime=runtime)],
+            "planner_status": "failed",
+            "planner_attempts": PLANNER_MAX_ATTEMPTS,
+            "planner_error": {"category": type(last_error).__name__, "node": "openrouter_reason"},
+            "trace": [self._event(state, "openrouter_reason", "OpenRouter retries exhausted", "Manual handling required", "degraded", runtime)],
         }
 
     def reconcile_guard(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        if state.get("planner_status") == "failed":
+            return self._reconcile_without_proposal(state, runtime)
         raw_verdict = dict(state["policy_verdict"])
         raw_verdict["outcome"] = Outcome(raw_verdict["outcome"])
         verdict = PolicyVerdict(**raw_verdict)
@@ -222,20 +254,43 @@ class WorkflowNodes:
         if decision["outcome"] == "REQUEST_EVIDENCE" and state.get("cycle_count", 1) >= state.get("max_cycles", 2):
             decision["reason_key"] = "cycle_exhausted"
             decision["reason_params"] = {}
-        return {
+        update = {
             "decision": decision,
             "action_payload": payload,
             "guardrail_override": result.override_info,
             "trace": [self._event(state, "reconcile_guard", "Apply deterministic guard", "Model proposal reconciled with policy", "override" if result.override_info else "complete", runtime)],
         }
+        if decision["outcome"] == Outcome.ESCALATE_COMPLIANCE.value:
+            update["final_outcome"] = "BLOCKED"
+        return update
 
-    def planner_error_handler(self, state: WorkflowState, error: NodeError) -> dict[str, Any]:
-        return {
-            "planner_status": "failed",
-            "planner_attempts": 3,
-            "planner_error": {"category": type(error.error).__name__, "node": error.node},
-            "trace": [self.event("openrouter_reason", "OpenRouter retries exhausted", "Manual handling required", "degraded", state)],
+    def _reconcile_without_proposal(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        """Fail-closed path for a planner outage: the sanctions hard stop
+        (already computed by `policy_precheck`) survives untouched; anything
+        else degrades to a manual review with no automated action."""
+        verdict = dict(state.get("policy_verdict") or {})
+        if verdict.get("outcome") != Outcome.ESCALATE_COMPLIANCE.value:
+            verdict.update({"outcome": Outcome.MANUAL_REVIEW.value, "action": None, "reason_key": "ai_unavailable", "reason_params": {}})
+        decision = {
+            "outcome": verdict.get("outcome"),
+            "action": verdict.get("action"),
+            "risk_level": verdict.get("risk_level", "UNKNOWN"),
+            "reason_key": verdict.get("reason_key"),
+            "reason_params": verdict.get("reason_params", {}),
+            "action_payload": None,
+            "guardrail_override": None,
         }
+        update: dict[str, Any] = {
+            "decision": decision,
+            "action_payload": None,
+            "guardrail_override": None,
+            "trace": [self._event(state, "reconcile_guard", "Safe failure route", "Deterministic policy remains authoritative", "degraded", runtime)],
+        }
+        if decision["outcome"] == Outcome.ESCALATE_COMPLIANCE.value:
+            update["final_outcome"] = "BLOCKED"
+        else:
+            update["operational_reason"] = decision["reason_key"]
+        return update
 
     def tool_error_handler(self, field: str):
         def handler(state: WorkflowState, error: NodeError) -> dict[str, Any]:
@@ -245,20 +300,6 @@ class WorkflowNodes:
                 "trace": [self.event(error.node, "Authoritative tool unavailable", "Manual handling required", "degraded", state)],
             }
         return handler
-
-    def safe_failure(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
-        verdict = dict(state.get("policy_verdict") or {})
-        if verdict.get("outcome") != Outcome.ESCALATE_COMPLIANCE.value:
-            verdict.update({"outcome": Outcome.MANUAL_REVIEW.value, "action": None, "reason_key": "ai_unavailable", "reason_params": {}})
-            reason = "ai_unavailable"
-        else:
-            reason = verdict.get("reason_key")
-        return {
-            "decision": verdict,
-            "action_payload": None,
-            "operational_reason": reason,
-            "trace": [self._event(state, "safe_failure", "Safe failure route", "Deterministic policy remains authoritative", "degraded", runtime)],
-        }
 
     def action_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         """Pause before a write, presenting the exact bounded payload to a reviewer."""
@@ -280,7 +321,7 @@ class WorkflowNodes:
         review = {"approved": response["approved"]}
         if not response["approved"]:
             review["reason"] = str(response["reason"]).strip()
-        return {
+        update = {
             "review_result": review,
             "action_payload": payload,
             "current_node": "action_review",
@@ -290,6 +331,9 @@ class WorkflowNodes:
                 runtime=runtime,
             )],
         }
+        if not response["approved"]:
+            update["final_outcome"] = "REJECTED"
+        return update
 
     def execute_action(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         review = state.get("review_result") or {}
@@ -299,10 +343,14 @@ class WorkflowNodes:
         if not isinstance(payload, dict):
             raise ValueError("action_payload is required for execution")
         result = self.tools.execute_approved_action(payload, action_idempotency_key(payload))
-        return {
+        update = {
             "action_result": result,
             "trace": [self._event(state, "execute_action", "Execute approved action", "Action gateway completed", runtime=runtime)],
         }
+        if result.get("status") == "executed" and result.get("action") == "request_document":
+            update["submission_attempts"] = 0
+            update["submission_exhausted"] = False
+        return update
 
     def await_documents(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         payload = (state.get("decision") or {}).get("action_payload") or {}
@@ -331,12 +379,22 @@ class WorkflowNodes:
         )
         submitted = {item["type"] for item in documents} if valid_items else set()
         valid = valid_items and required.issubset(submitted)
+        attempts = int(state.get("submission_attempts", 0)) + 1
+        exhausted = not valid and attempts >= MAX_SUBMISSION_ATTEMPTS
+        detail = "Evidence accepted" if valid else ("Resubmission attempts exhausted" if exhausted else "Evidence incomplete")
         update: dict[str, Any] = {
             "submission_valid": bool(valid),
-            "trace": [self._event(state, "validate_submission", "Validate submitted evidence", "Evidence accepted" if valid else "Evidence incomplete", "complete" if valid else "degraded", runtime)],
+            "submission_attempts": attempts,
+            "submission_exhausted": exhausted,
+            "trace": [self._event(state, "validate_submission", "Validate submitted evidence", detail, "complete" if valid else "degraded", runtime)],
         }
         if valid:
             update["submitted_documents"] = list(state.get("submitted_documents", [])) + list(documents)
+        if exhausted:
+            update["operational_reason"] = "submission_attempts_exhausted"
+            existing_decision = state.get("decision")
+            if existing_decision:
+                update["decision"] = {**existing_decision, "reason_key": "submission_attempts_exhausted", "reason_params": {}}
         return update
 
     def increment_cycle(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
@@ -344,20 +402,24 @@ class WorkflowNodes:
         if state.get("cycle_count", 1) >= state.get("max_cycles", 2):
             raise ValueError("maximum evidence cycles reached")
         update: dict[str, Any] = {"cycle_count": state.get("cycle_count", 1) + 1, "current_node": "load_customer"}
-        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "policy_status", "proposal", "planner_status", "planner_attempts", "planner_error", "guardrail_override", "decision", "action_payload", "review_result", "action_result", "document_submission", "submission_valid", "operational_reason"):
+        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "policy_status", "proposal", "planner_status", "planner_attempts", "planner_error", "guardrail_override", "decision", "action_payload", "review_result", "action_result", "document_submission", "submission_valid", "operational_reason", "evidence_ok", "final_outcome"):
             update[field] = None
-        update.update({"policy_status": "pending", "planner_status": "pending", "planner_attempts": 0})
+        update.update({
+            "policy_status": "pending", "planner_status": "pending", "planner_attempts": 0,
+            "submission_attempts": 0, "submission_exhausted": False,
+        })
         return update
 
     def operational_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         reason = state.get("operational_reason") or "manual_review_required"
         decision = state.get("decision")
         exhausted_evidence = bool(decision and decision.get("outcome") == "REQUEST_EVIDENCE" and state.get("cycle_count", 1) >= state.get("max_cycles", 2))
-        if exhausted_evidence:
-            reason = "cycle_exhausted"
+        relabel = "cycle_exhausted" if exhausted_evidence else "submission_attempts_exhausted" if decision and state.get("submission_exhausted") else None
+        if relabel:
+            reason = relabel
             decision = {**decision, "reason_key": reason, "reason_params": {}}
         update: dict[str, Any] = {}
-        if exhausted_evidence:
+        if relabel:
             update["decision"] = decision
         if not decision:
             decision = {
@@ -382,21 +444,18 @@ class WorkflowNodes:
         })
         return update
 
-    def _finalize(self, state: WorkflowState, status: str, title: str, runtime: Any = None) -> dict[str, Any]:
+    def finalize(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
+        """One terminal node for every outcome. `final_outcome` is written by
+        whichever phase decided the case (reconcile_guard for BLOCKED,
+        action_review for REJECTED); anything else defaults to COMPLETED,
+        which covers CLEAR, a completed action, and every operational-review
+        handoff."""
+        status = state.get("final_outcome") or "COMPLETED"
         return {
             "workflow_status": status,
-            "current_node": title,
-            "trace": [self._event(state, title, title.replace("_", " ").title(), f"Workflow ended with {status}", runtime=runtime)],
+            "current_node": "finalize",
+            "trace": [self._event(state, "finalize", "Finalize decision", f"Workflow ended with {status}", runtime=runtime)],
         }
-
-    def finalize(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
-        return self._finalize(state, "COMPLETED", "finalize", runtime)
-
-    def finalize_blocked(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
-        return self._finalize(state, "BLOCKED", "finalize_blocked", runtime)
-
-    def finalize_rejected(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
-        return self._finalize(state, "REJECTED", "finalize_rejected", runtime)
 
     def action_error_handler(self, state: WorkflowState, error: NodeError) -> dict[str, Any]:
         return {

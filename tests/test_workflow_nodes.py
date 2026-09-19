@@ -57,13 +57,6 @@ class WorkflowNodeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.nodes.intake({**state, "planner_mode": "heuristic"})
 
-    def test_planner_error_handler_is_sanitized(self) -> None:
-        update = self.nodes.planner_error_handler(
-            self.state, NodeError(RuntimeError("secret payload"), "openrouter_reason")
-        )
-        self.assertEqual(update["planner_status"], "failed")
-        self.assertNotIn("secret payload", repr(update))
-
     def test_tool_error_handler_is_sanitized_and_marks_fact_unavailable(self) -> None:
         update = self.nodes.tool_error_handler("risk_facts")(
             self.state, NodeError(RuntimeError("credential=secret"), "load_risk")
@@ -91,18 +84,37 @@ class WorkflowNodeTests(unittest.TestCase):
         self.assertEqual(decision["guardrail_override"]["model"], "test-model")
         self.assertEqual(decision["guardrail_override"]["final_outcome"], "ESCALATE_COMPLIANCE")
 
-    def test_safe_failure_preserves_sanctions_hard_stop(self) -> None:
+    def test_reconcile_guard_preserves_sanctions_hard_stop_on_planner_failure(self) -> None:
         state = {
             **self.state,
+            "planner_status": "failed",
             "policy_verdict": {
                 "outcome": "ESCALATE_COMPLIANCE", "action": None,
                 "risk_level": "CRITICAL", "reason_key": "sanctions_hit",
                 "reason_params": {"score": 0.91},
             },
         }
-        update = self.nodes.safe_failure(state)
+        update = self.nodes.reconcile_guard(state)
         self.assertEqual(update["decision"]["outcome"], "ESCALATE_COMPLIANCE")
         self.assertIsNone(update["action_payload"])
+        self.assertEqual(update["final_outcome"], "BLOCKED")
+
+    def test_reconcile_guard_degrades_to_manual_review_on_planner_failure(self) -> None:
+        state = {
+            **self.state,
+            "planner_status": "failed",
+            "policy_verdict": {
+                "outcome": "REQUEST_EVIDENCE", "action": "request_document",
+                "risk_level": "MEDIUM", "reason_key": "missing_evidence",
+                "reason_params": {"fields": ["proof_of_address"]},
+            },
+        }
+        update = self.nodes.reconcile_guard(state)
+        self.assertEqual(update["decision"]["outcome"], "MANUAL_REVIEW")
+        self.assertEqual(update["decision"]["reason_key"], "ai_unavailable")
+        self.assertIsNone(update["action_payload"])
+        self.assertEqual(update["operational_reason"], "ai_unavailable")
+        self.assertNotIn("final_outcome", update)
 
 
 class WorkflowHumanNodeTests(unittest.TestCase):
@@ -191,12 +203,22 @@ class WorkflowHumanNodeTests(unittest.TestCase):
         }
         update = self.nodes.increment_cycle(state)
         self.assertEqual(update["cycle_count"], 2)
-        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "proposal", "decision", "review_result", "action_result"):
+        for field in ("customer_facts", "document_facts", "screening_facts", "risk_facts", "facts", "citations", "policy_verdict", "proposal", "decision", "review_result", "action_result", "evidence_ok", "final_outcome"):
             self.assertIsNone(update[field])
+        self.assertEqual(update["submission_attempts"], 0)
+        self.assertFalse(update["submission_exhausted"])
         self.assertNotIn("trace", update)
         self.assertNotIn("tool_calls", update)
         self.assertNotIn("tool_errors", update)
         self.assertNotIn("submitted_documents", update)
+
+    def test_validate_submission_exhausts_after_max_attempts(self) -> None:
+        state = {**self.state, "submission_attempts": 2, "document_submission": {"documents": []}}
+        validated = self.nodes.validate_submission(state)
+        self.assertFalse(validated["submission_valid"])
+        self.assertTrue(validated["submission_exhausted"])
+        self.assertEqual(validated["submission_attempts"], 3)
+        self.assertEqual(validated["operational_reason"], "submission_attempts_exhausted")
 
     @patch("app.workflow.nodes.interrupt", return_value={"acknowledged": True})
     def test_operational_review_creates_safe_manual_handoff(self, mocked_interrupt) -> None:
@@ -207,12 +229,13 @@ class WorkflowHumanNodeTests(unittest.TestCase):
         self.assertEqual(update["action_payload"], None)
         self.assertEqual(update["review_result"], {"acknowledged": True})
 
-    def test_terminal_nodes_set_status_and_append_one_trace_event(self) -> None:
-        for name, expected in (("finalize", "COMPLETED"), ("finalize_blocked", "BLOCKED"), ("finalize_rejected", "REJECTED")):
-            update = getattr(self.nodes, name)(self.state)
+    def test_finalize_reads_final_outcome_and_defaults_to_completed(self) -> None:
+        for final_outcome, expected in ((None, "COMPLETED"), ("BLOCKED", "BLOCKED"), ("REJECTED", "REJECTED")):
+            state = {**self.state, "final_outcome": final_outcome} if final_outcome else self.state
+            update = self.nodes.finalize(state)
             self.assertEqual(update["workflow_status"], expected)
             self.assertEqual(len(update["trace"]), 1)
-            self.assertEqual(update["trace"][0]["step"], name)
+            self.assertEqual(update["trace"][0]["step"], "finalize")
 
     def test_action_error_handler_is_sanitized_and_degraded(self) -> None:
         update = self.nodes.action_error_handler(self.state, NodeError(RuntimeError("credential=secret"), "execute_action"))
