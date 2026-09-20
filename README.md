@@ -41,7 +41,7 @@ actively manipulated?**
 | Safety | `app/policy.py`, pure functions | Independent of the model; the actual safety boundary, unit-testable in isolation |
 | i18n | `app/i18n.py`, template-based | Deterministic content renders in English/Vietnamese offline; only free-form LLM text needs a (best-effort, gracefully-degrading) translation call |
 | Observability | MLflow (optional) | Traces + experiment tracking; natural fit with the MLOps/Databricks stack already in use |
-| UI | Zero-dependency HTTP server (primary) + Streamlit (rich/optional) | The primary demo starts in under a second with no external services; Streamlit shows LangGraph's native interrupt/resume UI and MLflow side by side |
+| UI | FastAPI + static UI (primary) + Streamlit over HTTP (rich/optional) | The primary demo is a validated HTTP API with a static front end; Streamlit talks to the same API over `KYCClient` and adds MLflow tracing side by side |
 | Domain | Ontology (`data/ontology.json`) + typed dataclasses (`app/domain.py`) | Governance beyond a prompt/RAG-only design |
 
 ## Repository map
@@ -54,8 +54,10 @@ app/
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
   agent.py       KYCExceptionAgent façade over the fan-out/fan-in workflow
-  api.py         primary demo: FastAPI HTTP API + static UI
-  ui.py          optional rich demo: Streamlit, native interrupt/resume, MLflow tracing
+  api.py         primary demo: FastAPI HTTP API + static UI, lifespan-owned checkpointer, best-effort MLflow autolog
+  checkpointing.py  make_checkpointer(): Redis Stack -> in-memory fallback, credential-redacted logging
+  client.py      KYCClient: typed HTTP client used by app/ui.py, rehydrates AgentDecision from JSON
+  ui.py          optional rich demo: Streamlit over HTTP via KYCClient, native interrupt/resume UI
   cli.py         terminal demo
 data/
   ontology.json  domain entities, relations, constraints
@@ -66,7 +68,10 @@ evals/
 static/
   index.html     demo UI served by app/api.py
 tests/
-  test_agent.py  policy unit tests, tool idempotency, end-to-end graph tests, i18n tests, mocked-LLM adapter test
+  test_agent.py         policy unit tests, tool idempotency, end-to-end graph tests, i18n tests, mocked-LLM adapter test
+  test_checkpointing.py make_checkpointer() Redis/memory/degraded-fallback behavior
+  test_client.py        KYCClient against a mocked HTTP transport
+  test_workflow_*.py    FastAPI route contracts, error mapping, graph-surface regressions
 docs/
   INTERVIEW_GUIDE.md, ARCHITECTURE.md, PRODUCTION_ROADMAP.md, ROUNDS_2_AND_3.md
 slides/
@@ -180,10 +185,15 @@ After starting the server, confirm it before trusting the UI's tracing
 status: `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5001/`
 must print `200`.
 
-Terminal 2 -- the app:
+Terminal 2 -- the agent runtime (leave running; Streamlit talks to this over HTTP):
 
 ```bash
-# with the runtime from the previous section already running
+MLFLOW_TRACKING_URI=http://127.0.0.1:5001 uv run python -m app.api
+```
+
+Terminal 3 -- the app:
+
+```bash
 KYC_API_URL=http://127.0.0.1:8000 uv run streamlit run app/ui.py
 ```
 
@@ -220,11 +230,12 @@ uv run python -m unittest discover -s tests -v
 uv run python -m evals.run_evals
 ```
 
-116 unit tests (policy branch coverage, graph routes, tool idempotency,
+139 unit tests (policy branch coverage, graph routes, tool idempotency,
 planner-failure resilience, end-to-end runs, i18n rendering, the mocked
-OpenRouter adapter, relocalization, and concurrency) and 19 deterministic
-scenario/safety checks, including the compromised-proposal guardrail route and
-Vietnamese rendering.
+OpenRouter adapter, relocalization, concurrency, FastAPI route/error
+contracts, the Redis/memory checkpointer fallback, and the HTTP client) and
+19 deterministic scenario/safety checks, including the compromised-proposal
+guardrail route and Vietnamese rendering.
 
 **Honest scope note:** CI uses deterministic eval doubles and a mocked
 OpenRouter transport so tests do not require a network or credential. A live
