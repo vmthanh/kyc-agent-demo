@@ -6,6 +6,13 @@ Copy-paste commands for running the demo live. For talking points and timing, se
 > CLI output is plain JSON (set `KYC_PRINT_GRAPH=1` to also print the Mermaid
 > graph). The `sed -n '/^{/,$p'` filter below is harmless either way.
 
+## Presentation files
+
+- Main 14-slide deck: open `slides/index.html` in a browser (`N` toggles speaker notes).
+- Concise 9-slide technical deck: `slides/index-concise.html`.
+- PowerPoint (generated locally, gitignored): `uv run --with python-pptx python slides/to_pptx.py`.
+- Narrative/timing: `docs/INTERVIEW_GUIDE.md`. Slides use committed images in `slides/assets/`.
+
 ## 0. One-time setup
 
 ```bash

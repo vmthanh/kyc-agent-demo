@@ -262,28 +262,28 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 ---
 
-## Task 13: Narrative, docs, deck
+## Task 13: Narrative, docs, deck (presentation assets done; human rehearsal pending)
 
-- [ ] README "Dana mapping" table:
+- [x] README "Dana mapping" table (honest as-built mapping; P2 features marked not built):
 
 | DanaOS concept | This repo |
 |---|---|
 | Structural ontology | `ontology.structural` |
 | Cognitive ontology | `ontology.cognitive.rules` (policy + expert sources) |
-| Dana Factory | `app/curate.py`, `app/reflect.py` candidate drafting |
+| Dana Factory | `app/reflect.py` candidate drafting; `app/curate.py` **not built (P2)** |
 | Dana Runtime | `app/workflow` + authority matrix |
 | Dana Assurance | golden replay, impact report, promotion gate, scorecard |
 | Propose → Verify → Commit | planner → ontology guard → quorum-approved idempotent gateway |
 | See → Think → Act → Reflect | trace `phase` |
-| Sovereign / small models | `planner_mode=local` |
-| Vertical packs | `packs/kyc`, `packs/boiler` |
+| Sovereign / small models | `planner_mode=local` adapter; **local benchmark pending** |
+| Vertical packs | `packs/kyc`, `packs/boiler` **not built (P2)** |
 
-- [ ] Rewrite `docs/INTERVIEW_GUIDE.md` to the new 15-min flow:
+- [x] Rewrite `docs/INTERVIEW_GUIDE.md` to the new 15-min flow:
   1. Problem in Dana terms (1m) · 2. KYC-1044 compare (3m) · 3. KYC-1043 expert rule + KYC-1046 boundary (3m) ·
   4. KYC-1042 Propose→Verify→Commit + quorum (3m) · 5. Reflect: rejection → candidate → replay → promote (3m) ·
   6. Scorecard + pack reuse (2m) + question: "Which customer workflow would you pilot first?"
-- [ ] Update `slides/index.html` (Dana mapping slide, scorecard slide, before/after compare screenshot); keep `tests/test_concise_slides.py` green.
-- [ ] Rehearse twice with a timer; record fallback path if OpenRouter is down (eval planner + recorded scorecard).
+- [x] Update `slides/index.html` (Dana mapping, expert rule, compare screenshot, scorecard, Reflect; 14 slides); update concise deck without breaking its 9-slide contract; keep `tests/test_concise_slides.py` green.
+- [ ] Rehearse twice with a human presenter and timer (cannot be validated by automated tests). Fallback is documented in `docs/INTERVIEW_GUIDE.md`: offline evals + explicitly recorded scorecard and screenshots.
 - [ ] Commit: `docs: align README, guide, and deck with the Dana-aligned demo`.
 
 ---

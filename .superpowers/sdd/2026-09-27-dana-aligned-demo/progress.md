@@ -17,4 +17,5 @@ Baseline (2026-09-27): `uv run python -m unittest discover -s tests` → 139 tes
 | 8 Authority matrix | ✅ done | 5f08f8a | 222 OK, evals 24/24 | risk-tiered maker-checker; promotion = KYC Lead + Compliance; see `task-8-report.md` |
 | 9 Local small model | ⚠️ integration done; local benchmark pending | e798cf1 | 228 OK, evals 24/24 | local endpoint mocked; hosted 7–8B failed schema; no model downloaded; see `task-9-report.md` |
 | **P1 phase** | ⚠️ implementation complete; local benchmark pending | | | |
-| 10–13 (P2, wrap) | ⬜ todo | | | |
+| 10–12 (P2) | ⬜ todo | | | Document curation, pack split, live graph/lineage UI not implemented |
+| 13 Docs + deck | ✅ assets/docs done; human rehearsal pending | see git log | 231 OK, evals 24/24 | 14-slide HTML + exported local PPTX; see `task-13-report.md` |

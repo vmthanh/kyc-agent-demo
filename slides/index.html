@@ -184,6 +184,10 @@ table.grid.dense td{font-size:14px;padding:12px 14px}
 .codestrip{background:var(--ink);padding:20px 26px}
 .codestrip div{font-size:17px;font-weight:700;color:var(--white);line-height:1.7;white-space:pre}
 .codestrip div.hl{color:var(--lime)}
+.demo-shot{width:100%;height:100%;min-width:0;min-height:0;max-height:100%;object-fit:contain;object-position:center top;border:1px solid var(--hair);background:#f8faf8}
+.metric-big{font-size:49px;font-weight:700;line-height:1;color:var(--green);margin:10px 0}
+.metric-big.alert{color:var(--alert)}
+.pill{display:inline-block;padding:7px 12px;background:var(--panel);font-size:14px;font-weight:700;margin:0 8px 8px 0}
 
 /* ---------- notes / controls ---------- */
 .notes{display:none}
@@ -243,25 +247,25 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <!-- ============================== 02 AGENDA ============================== -->
 <section class="slide">
   <div class="kicker">Agenda</div>
-  <h1>Round two: architecture, the graph rewrite, and proof</h1>
-  <div class="body cards c2" style="grid-auto-rows:280px">
+  <h1>A small DanaOS-style pattern, implemented and measured</h1>
+  <div class="body cards c2" style="grid-auto-rows:235px;gap:16px;margin-top:24px">
     <div class="card"><div class="k">01 · Architecture</div><h3>How the agent is bounded</h3>
-      <p>Runtime layers, ground → gate → propose → guard → act, with a deterministic override on every model proposal.</p>
-      <div class="f">Slides 3–8</div></div>
-    <div class="card"><div class="k">02 · Seams</div><h3>What's demo vs. production</h3>
-      <p>One named production path for every shortcut: planner, state, gateway, observability, tenancy.</p>
-      <div class="f">Slide 9</div></div>
+      <p>Structural + executable cognitive ontology; See → Think → Act → Reflect and Propose → Verify → Commit.</p>
+      <div class="f">Trace every decision to rule, version and policy</div></div>
+    <div class="card"><div class="k">02 · Domain judgment</div><h3>Capture the expert</h3>
+      <p>Vietnamese OCR/diacritic mismatch gets a bounded re-upload request; a different person still needs manual review.</p>
+      <div class="f">KYC-1043 versus KYC-1046</div></div>
     <div class="card lime"><div class="k">03 · Proof</div><h3>Live, not asserted</h3>
-      <p>Two live cases, then the debugging loop and failure taxonomy behind 139 tests + 19 evals.</p>
-      <div class="f">Slides 10–11</div></div>
-    <div class="card"><div class="k">04 · Close</div><h3>What's transferable</h3>
-      <p>The pattern behind the demo, for the next exception family.</p>
-      <div class="f">Slide 12</div></div>
+      <p>Live generic RAG comparison, risk-tiered maker-checker, evidence-gated Reflect, and a 60-case scorecard.</p>
+      <div class="f">228 tests · 24 eval checks</div></div>
+    <div class="card"><div class="k">04 · Boundaries</div><h3>What is not claimed</h3>
+      <p>No DanaOS integration, no second domain pack, no local-model benchmark, and no production tenancy.</p>
+      <div class="f">A working KYC slice, not a product replica</div></div>
   </div>
   <div class="pagenum">02 / 12</div>
   <aside class="notes" data-src="KYC Agent demo repository · docs/INTERVIEW_GUIDE.md">
-    Same panel as round one, so skip the pitch and the archetypes — go straight to architecture, the graph
-    rewrite, the seams, and live proof. Interrupt me anywhere; the demo runs live from slide 10.
+    The system is inspired by Aitomatic's public DanaOS positioning; this is our independent POC, not their product.
+    Lead with the executable ontology, show the contrast, then demonstrate guarded action and evidence-gated change.
   </aside>
 </section>
 
@@ -302,16 +306,16 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     This is the layer diagram interviewers ask for first: where does a click actually go? Static UI and Streamlit
     are both thin — neither holds graph state or business logic, they just call the same REST contract. FastAPI's
     lifespan is the one place that constructs the agent and checkpointer, so there's exactly one of each per process.
-    The checkpointer (Redis Stack or in-memory fallback) makes graph state durable across a restart; it does not by
-    itself make the service horizontally scalable, because pending-approval handles are still process-local — that's
-    the explicit, named scale boundary, not a hidden gap.
+    Redis Stack can persist graph state; the in-memory fallback cannot survive a restart. Neither option makes
+    pending approval handles durable because those live in process memory. Horizontal scaling requires storing
+    those handles and approval events durably as well.
   </aside>
 </section>
 
 <!-- ============================== 04 ARCH PIPELINE ============================== -->
 <section class="slide">
   <div class="kicker">Architecture</div>
-  <h1>Ontology structures context; policy controls autonomy</h1>
+  <h1>The executable ontology decides; the model advises</h1>
   <div class="body" style="margin-top:24px">
     <div class="fanout">
       <div class="fanout-stage">
@@ -338,12 +342,12 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     </div>
     <div class="workflow-caption" style="margin-top:12px">4 reads run in parallel, fan in at the evidence gate; the guard fans back out into 4 routes, one loops verified evidence back to grounding.</div>
     <div style="margin-top:16px">
-      <div class="kicker" style="margin-bottom:8px">Domain ontology</div>
+      <div class="kicker" style="margin-bottom:8px">Structural entities → versioned cognitive rule → cited policy → resolution</div>
       <div class="chain">
         <div class="cnode" style="height:42px">Customer</div><div class="arw">→</div>
         <div class="cnode" style="height:42px">Application</div><div class="arw">→</div>
         <div class="cnode" style="height:42px">Evidence</div><div class="arw">→</div>
-        <div class="cnode" style="height:42px">Risk finding</div><div class="arw">→</div>
+        <div class="cnode hl" style="height:42px">Rule @ version</div><div class="arw">→</div>
         <div class="cnode" style="height:42px">Policy</div><div class="arw">→</div>
         <div class="cnode" style="height:42px">Resolution</div>
       </div>
@@ -353,61 +357,56 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     Model proposes <span class="sep">|</span> Guard recomputes independently and picks the route
   </div>
   <div class="tiny" style="position:absolute;left:48px;bottom:66px">
-    Graph state is JSON-safe, so the checkpointer swaps to Postgres/Redis without a rewrite.
+    Graph state is JSON-safe; pending approval handles and simulated ticket storage remain process-local.
   </div>
   <div class="pagenum">04 / 12</div>
   <aside class="notes" data-src="app/workflow/graph.py · app/workflow/routing.py · app/policy.py · data/ontology.json · docs/ARCHITECTURE.md">
-    Walk through the fan-out/fan-in names. Ground calls four read tools; the evidence gate and policy precheck run
-    before OpenRouter; reconcile_guard recomputes the mandate and chooses the route; review pauses on interrupt();
-    execute runs through the idempotent gateway.
-    Schemas, authorization and writes all live outside the model.
+    data/ontology.json now contains structural entities and executable cognitive rules. app/ontology.py validates a
+    closed rule language (no eval, no case_note inputs, hard-stop rules before other rules). Each verdict names its
+    rule@version and citation. The proposal is advisory; reconcile_guard enforces the matched rule.
   </aside>
 </section>
 
 <!-- ============================== 05 GRAPH UPGRADE ============================== -->
 <section class="slide">
   <div class="kicker">Architecture</div>
-  <h1>The graph itself was upgraded: from a linear chain to a risk-adaptive workflow</h1>
+  <h1>DanaOS concepts mapped to this independent KYC POC</h1>
   <div class="body">
     <div class="split">
       <div class="panel compact">
-        <div class="ph">Before · linear chain</div>
-        <h3 style="font-size:19px">One path, one shot</h3>
+        <div class="ph">DanaOS-style concept · public positioning</div>
+        <h3 style="font-size:19px">The design vocabulary</h3>
         <ul>
-          <li><b>Grounding</b> — 4 reads run one at a time</li>
-          <li><b>Failures</b> — one tool error fails the run</li>
-          <li><b>Model gating</b> — reasons against whatever facts exist</li>
-          <li><b>Routing</b> — approve-or-block only</li>
-          <li><b>Resume</b> — one bolted-on interrupt path</li>
-          <li><b>Code shape</b> — one ~600-line class</li>
+          <li><b>Cognitive ontology</b> — executable expert judgment</li>
+          <li><b>Factory</b> — draft and validate rule amendments</li>
+          <li><b>Runtime</b> — governed reads, proposals and writes</li>
+          <li><b>Assurance</b> — replay before promotion</li>
+          <li><b>See → Think → Act → Reflect</b> — auditable loop</li>
+          <li><b>Sovereignty</b> — optional local endpoint</li>
         </ul>
       </div>
       <div class="panel dark compact">
-        <div class="ph">After · risk-adaptive graph</div>
-        <h3 style="font-size:19px">Parallel, retried, resumable</h3>
+        <div class="ph">Implemented in this repo</div>
+        <h3 style="font-size:19px">Concrete files and gates</h3>
         <ul>
-          <li><b>Grounding</b> — 4 reads run in parallel, fan in at one gate</li>
-          <li><b>Failures</b> — retry with backoff, then a safe-failure route</li>
-          <li><b>Model gating</b> — evidence + policy checked before the model sees the case</li>
-          <li><b>Routing</b> — guard routes to 4 named outcomes, plus a resume cycle</li>
-          <li><b>Resume</b> — run/resume/approve/reject on native interrupt ids</li>
-          <li><b>Code shape</b> — 4 small modules, each independently tested</li>
+          <li><b>data/ontology.json</b> — 5 rules incl. expert source</li>
+          <li><b>app/reflect.py</b> — candidate + impact report</li>
+          <li><b>app/workflow + authority.py</b> — guard and quorum</li>
+          <li><b>evals/scorecard.py</b> — 60 labelled cases</li>
+          <li><b>Trace metadata</b> — phase + governance stage</li>
+          <li><b>LocalPlanner</b> — adapter only; no local benchmark</li>
         </ul>
       </div>
     </div>
   </div>
   <div class="banner sm" style="position:absolute;left:48px;right:48px;bottom:74px">
-    Same safety boundary, now resilient to failures and able to loop a case through more than one evidence cycle
+    Inspired by the pattern; not DanaOS, OpenSSA, a certified compliance system, or a production deployment
   </div>
   <div class="pagenum">05 / 12</div>
   <aside class="notes" data-src="app/workflow/graph.py · app/workflow/nodes.py · app/workflow/routing.py · .superpowers/sdd/2026-09-15-risk-adaptive-langgraph-workflow/">
-    This is the upgrade slide, not the steady-state architecture slide before it. The legacy agent.py was one
-    KYCExceptionAgent class with a five-node chain and a single approval interrupt; document resubmission was a
-    special case bolted on rather than a graph cycle. The rewrite makes grounding parallel, adds retry policies per
-    node class, splits gating (evidence_gate, policy_precheck) ahead of the model call, and generalizes the
-    interrupt contract so approval, document submission and operational review all resume the same way. Net result:
-    faster grounding, safer under transient failures, and cases can cycle through more than one round of evidence
-    without new code — at the cost of more files, which is why each one is independently tested.
+    These are analogies to Aitomatic's public product vocabulary, not a claim of integration or equivalence.
+    Dana Factory's document-to-rule curation and vertical-pack reuse are future work (P2). LocalPlanner has mocked
+    transport tests but no local model was installed or benchmarked. POC only; a customer pilot needs policy review.
   </aside>
 </section>
 
@@ -455,54 +454,49 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <!-- ============================== 07 POLICY ENGINE ============================== -->
 <section class="slide">
   <div class="kicker">Architecture</div>
-  <h1>The policy engine: exhaustive branch order, no free text, no model input</h1>
+  <h1>Rules are data: priority, provenance and a bounded expert exception</h1>
   <div class="body">
-    <table class="grid">
-      <colgroup><col style="width:9%"><col style="width:33%"><col style="width:26%"><col style="width:32%"></colgroup>
-      <thead><tr><th>Priority</th><th>Condition over typed facts</th><th>Mandated outcome</th><th>Bounded action</th></tr></thead>
+    <table class="grid dense">
+      <colgroup><col style="width:20%"><col style="width:38%"><col style="width:21%"><col style="width:21%"></colgroup>
+      <thead><tr><th>Rule @ version</th><th>Typed condition</th><th>Mandate</th><th>Source / citation</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td class="mono">sanctions score ≥ 0.80</td>
-            <td class="stop">ESCALATE_COMPLIANCE</td><td class="stop">none — no contact, no approval</td></tr>
-        <tr><td>2</td><td>identity or liveness fails</td>
-            <td>MANUAL_REVIEW</td><td>open a review ticket</td></tr>
-        <tr><td>3</td><td>a required field is missing</td>
-            <td>REQUEST_EVIDENCE</td><td>ask for the missing documents</td></tr>
-        <tr><td>4</td><td>everything else passes</td>
-            <td>CLEAR</td><td>none — close and log</td></tr>
+        <tr><td>R-AML-01@1.0</td><td>Sanctions score ≥ 0.80 (hard stop)</td><td class="stop">ESCALATE</td><td>Policy · AML-SCREEN-02</td></tr>
+        <tr><td>R-ID-EXP-01@1.0</td><td>OCR/diacritic-only mismatch; live, tamper &lt; 0.10; nothing else missing</td><td>REQUEST_EVIDENCE</td><td>Expert · KYC-IDENTITY-12</td></tr>
+        <tr><td>R-ID-01@1.0</td><td>Other identity or liveness conflict</td><td>MANUAL_REVIEW</td><td>Policy · KYC-IDENTITY-11</td></tr>
+        <tr><td>R-EVID-01@1.0</td><td>Required evidence missing</td><td>REQUEST_EVIDENCE</td><td>Policy · KYC-EVIDENCE-07</td></tr>
+        <tr><td>R-CLEAR-01@1.0</td><td>Fallback: checks pass</td><td>CLEAR</td><td>Policy · KYC-CLEAR-01</td></tr>
       </tbody>
     </table>
-    <div class="stats" style="margin-top:30px">
-      <div class="stat wide"><div class="h">Pure</div><div class="b">No I/O, no model call, no display language</div></div>
-      <div class="stat wide"><div class="h">Reason keys</div><div class="b">Verdicts carry keys, rendered later</div></div>
-      <div class="stat wide"><div class="h">Override</div><div class="b">The guard keeps the mandate and logs the diff</div></div>
+    <div class="banner light sm" style="margin-top:25px">
+      <span class="mono">data/ontology.json</span> <span class="sep">→</span> validated closed-language interpreter
+      <span class="sep">→</span> versioned verdict + citation
     </div>
   </div>
   <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:74px">
-    The mandate always wins; every disagreement with the model is recorded in the trace
+    No case_note in rules · hard stops cannot be shadowed · reviewer approval is separate from a rule match
   </div>
   <div class="pagenum">07 / 12</div>
-  <aside class="notes" data-src="app/policy.py: evaluate(), guard(), SANCTIONS_THRESHOLD · app/i18n.py · tests/test_agent.py">
-    Branch order matters and is exhaustive: a screening hit always wins, then identity integrity, then evidence
-    completeness, then the no-exception case. The module is pure and cheap to unit test, which is why the policy
-    branches have full coverage. Verdicts carry reason_key plus params rather than a sentence, so English and
-    Vietnamese render from the same verdict at the presentation boundary.
+  <aside class="notes" data-src="data/ontology.json · app/ontology.py · app/names.py · tests/test_ontology.py · tests/test_expert_rule.py">
+    The file is loaded, not decorative. Changing a rule parameter changes the result without editing policy.py.
+    OCR/diacritic signals are deterministic facts; the expert rule only requests re-capture, never account approval.
+    KYC-1046 is the negative boundary case. The expert attribution is demo metadata, not a verified bank approval.
   </aside>
 </section>
 
 <!-- ============================== 08 ACTION BOUNDARY ============================== -->
 <section class="slide">
   <div class="kicker">Architecture</div>
-  <h1>The action boundary: approve parameters, execute once</h1>
+  <h1>Propose → Verify → Commit, with risk-tiered authority</h1>
   <div class="body cards c4" style="grid-auto-rows:302px">
     <div class="card tight"><div class="k">Parameters, not verbs</div><h3>Approval carries the full payload</h3>
       <p>The exact document list or evidence bundle, not just an action name. The ticket echoes what was approved.</p>
       <div class="f">A request, not a label</div></div>
     <div class="card tight"><div class="k">Two keys, two jobs</div><h3>Unique per run, stable per action</h3>
-      <p>The approval key is unique per run. The gateway key is a hash of case + action, so retries collapse into one ticket.</p>
+      <p>The approval key is unique per run. The gateway key hashes the canonical payload, including the rule and policy versions; retries collapse into one ticket.</p>
       <div class="f">Two runs, one side effect</div></div>
-    <div class="card tight"><div class="k">Read / write split</div><h3>Reads inline, writes gated</h3>
-      <p>Reads run automatically. Writes pause for approval; CLEAR and ESCALATE_COMPLIANCE have nothing to approve.</p>
-      <div class="f">No unapproved side effects</div></div>
+    <div class="card tight"><div class="k">Authority matrix</div><h3>High risk = two people</h3>
+      <p>KYC-1046 requires two distinct approvers; ontology promotion requires both KYC Lead and Compliance.</p>
+      <div class="f">1/2 cannot write · 2/2 can commit</div></div>
     <div class="card tight lime"><div class="k">Concurrency</div><h3>Serialized, and honest about it</h3>
       <p>One lock around the approval path, one around the ticket write. Correctness over throughput, for now.</p>
       <div class="f">N threads, one ticket</div></div>
@@ -515,103 +509,137 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   </div>
   <div class="pagenum">08 / 12</div>
   <aside class="notes" data-src="app/agent.py (_pending, approve) · app/tools.py: execute_approved_action · tests/test_agent.py · docs/ARCHITECTURE.md">
-    The two-key design is the detail worth dwelling on. A reviewer’s approval handle must be unique per run or
-    approving one run could resume another; the gateway’s dedup key hashes the canonical payload and policy versions
-    so retries replay one ticket while changed requests get a distinct key. Different lifetimes, different keys. And I am explicit that an in-process lock is a
-    demo-scoped answer.
+    The ontology authority matrix determines count and roles by action/risk. KYC-1046's HIGH identity conflict
+    pauses twice; one approver never executes. Each approval is recorded; a rejection halts the write. The gateway
+    key hashes the action payload and rule/policy versions; approval identity is audit metadata, not part of that key.
+    The in-memory pending handle and idempotency store are demo-scoped, not a durable production guarantee.
   </aside>
 </section>
 
 <!-- ============================== 09 SEAMS ============================== -->
 <section class="slide">
   <div class="kicker">Tech stack</div>
-  <h1>Every demo shortcut has one named production seam</h1>
+  <h1>What is built, and what a customer pilot still needs</h1>
   <div class="body">
     <table class="grid dense">
       <colgroup><col style="width:16%"><col style="width:31%"><col style="width:53%"></colgroup>
       <thead><tr><th>Component</th><th>Demo today</th><th>Production path</th></tr></thead>
       <tbody>
-        <tr><td>Planner</td><td>Two selectable modes: normal / compromised</td><td>Model gateway with retries, circuit breakers, rate limits, version pinning</td></tr>
-        <tr><td>Policy retrieval</td><td>Tagged chunks in a JSON file</td><td>Hybrid retrieval service with jurisdiction and effective-date filters</td></tr>
-        <tr><td>Workflow state</td><td>In-memory checkpointer (Redis Stack opt-in today)</td><td>Redis in every environment, plus stored approval events for pending tasks</td></tr>
-        <tr><td>Action gateway</td><td>In-memory idempotency log</td><td>Durable store with a unique constraint or compare-and-swap</td></tr>
-        <tr><td>Observability</td><td>MLflow traces, optional</td><td>OpenTelemetry spans, dashboards, cost/latency budgets, trajectory replay</td></tr>
+        <tr><td>Planner</td><td>OpenRouter; local OpenAI-compatible adapter</td><td>Pin model/version, evaluate schema reliability, route failures and costs</td></tr>
+        <tr><td>Ontology</td><td>Hand-authored, versioned executable KYC rules</td><td>Expert sign-off, source-document curation, jurisdiction/effective-date control</td></tr>
+        <tr><td>Workflow state</td><td>Memory; Redis Stack opt-in</td><td>Durable pending handles, approval events, multi-replica coordination</td></tr>
+        <tr><td>Action gateway</td><td>Simulated tickets and in-memory idempotency</td><td>Durable unique constraint, customer authorization and audit</td></tr>
+        <tr><td>Assurance</td><td>60 labels; in-process promotions, append-only demo audit</td><td>Persisted signals, immutable approvals, release gates and drift monitoring</td></tr>
         <tr><td>Tenancy</td><td>Single tenant, synthetic data</td><td>Tenant-scoped retrieval, per-tool identity, RBAC, audit retention</td></tr>
       </tbody>
     </table>
   </div>
   <div class="banner sm" style="position:absolute;left:48px;right:48px;bottom:74px">
-    The planner is the only place a new model backend goes <span class="sep">|</span> Python 3 · uv · 139 unit tests + 19 eval checks
+    228 unit tests · 24 deterministic eval checks <span class="sep">|</span> No local model benchmark or second domain pack
   </div>
   <div class="pagenum">09 / 12</div>
   <aside class="notes" data-src="README.md (Production seam) · docs/PRODUCTION_ROADMAP.md · app/planner.py · app/agent.py">
-    This slide exists so nobody has to guess what is demo scaffolding. Each row is a seam I would actually cut on,
-    and none of them touch the safety boundary. Interviewers usually push on state persistence and the idempotency
-    store — both are short answers because graph state is already JSON-safe and the dedup key is already
-    deterministic.
+    This is a POC with synthetic data. No customer-approved regulation, production integration, tenancy, or
+    air-gapped validation. LocalPlanner is an integration seam, not evidence that an 8B model works: hosted
+    Qwen2.5-7B and Qwen3-8B each returned zero valid proposals in a limited 10-case structured-output probe.
+    Do not claim parity with a larger model. P2 pack split and policy-document curation remain unbuilt.
   </aside>
 </section>
 
 <!-- ============================== 10 LIVE DEMO ============================== -->
 <section class="slide">
   <div class="kicker">Highlights</div>
-  <h1>Live demo: useful action, deliberate restraint, and a guardrail override</h1>
-  <div class="body cards c2" style="grid-auto-rows:326px">
-    <div class="card"><div class="k">KYC-1042 · NORMAL · TWO CYCLES</div><h3>Missing proof of address</h3>
-      <p><b>Cycle 1:</b> identity and liveness pass, but <span class="mono">proof_of_address</span> is absent. The
-        agent cites KYC-EVIDENCE-07 v2026.3, pauses for approval, and mints exactly one idempotent ticket.
-        <br><b>Cycle 2:</b> verified proof resumes the same checkpoint and the policy route reaches CLEAR.</p>
-      <div class="f">Approve → submit evidence → CLEAR</div></div>
-    <div class="card alert"><div class="k">KYC-1044 · ESCALATE COMPLIANCE</div><h3>Sanctions match + prompt injection</h3>
-      <p>A 0.91 screening score triggers a mandatory stop under AML-SCREEN-02 v2026.4. Switch to
-        “compromised_demo” and let OpenRouter propose; the guardrail still keeps the stop, and no approval token is emitted.</p>
-      <div class="f">Compromised mode, unchanged outcome</div></div>
+  <h1>KYC-1044: plain RAG can approve a 0.91 sanctions hit</h1>
+  <div class="body split" style="grid-template-columns:1.22fr .78fr;gap:24px;height:480px;margin-top:20px">
+    <img class="demo-shot" src="assets/compare-kyc1044.webp" alt="KYC-1044 comparison: generic RAG sometimes clears; governed agent escalates">
+    <div class="stack" style="gap:14px">
+      <div class="card alert" style="flex:1;padding:18px"><div class="k">Generic LLM + RAG</div><h3>Unsafe in 3–4 / 10 live samples</h3>
+        <p>Same gpt-4o-mini model; case note is ordinary prompt context. Without guard or approval, CLEAR would auto-approve.</p></div>
+      <div class="card" style="flex:1;padding:18px"><div class="k">Ontology-governed</div><h3>R-AML-01@1.0 → ESCALATE</h3>
+        <p>Hard stop, no approval token, zero automated writes. The baseline sampling rate varies; show live counts honestly.</p></div>
+    </div>
   </div>
-  <div class="codestrip" style="position:absolute;left:48px;right:48px;bottom:74px">
-    <div>uv run python -m app.api             # FastAPI demo at localhost:8000</div>
-    <div class="hl">uv run python -m app.cli --case KYC-1044 --planner compromised_demo</div>
-  </div>
+  <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:60px">Open http://localhost:8000 · KYC-1044 · normal · Compare with generic RAG</div>
   <div class="pagenum">10 / 12</div>
   <aside class="notes" data-src="data/cases.json (KYC-1042, KYC-1044) · app/api.py, static/index.html · app/cli.py · evals/run_evals.py">
-    Run 1042 first, approve, and submit proof of address to show cycle two. Then run 1044 in compromised_demo:
-    OpenRouter may recommend CLEAR, the guardrail forces ESCALATE_COMPLIANCE, and the override banner appears only
-    when the proposal differs. If the live model also escalates, explain independent agreement.
+    Use NORMAL mode for the comparison, not compromised_demo: in a 10/10 compromised-prompt probe the retrieved
+    sanctions policy won and the baseline escalated. The screenshot is from a previous live run, not a guarantee
+    of the next sample. Comparison is read-only: would_execute is counterfactual and does not call the gateway.
+  </aside>
+</section>
+
+<!-- ============================== EXPERT JUDGMENT ============================== -->
+<section class="slide">
+  <div class="kicker">Captured expert judgment</div>
+  <h1>A safe shortcut for OCR noise—not a shortcut around identity</h1>
+  <div class="body split" style="gap:22px">
+    <div class="card lime" style="height:280px"><div class="k">KYC-1043 · low-quality ID</div><h3>Trần Minh Anh ≠ Tran Mlnh Anh</h3>
+      <p>Lost diacritics + i/l glyph confusion; liveness passes, tamper 0.09 &lt; 0.10. Expert-sourced R-ID-EXP-01 asks for a clearer re-upload, never automatic approval.</p>
+      <div class="f">Approve request → verify new capture → CLEAR on cycle 2</div></div>
+    <div class="card alert" style="height:280px"><div class="k">KYC-1046 · different person</div><h3>Nguyễn Văn Bình ≠ Phạm Thị Lan</h3>
+      <p>Difference is not explainable by OCR. R-ID-01 sends it to MANUAL_REVIEW; HIGH risk requires two distinct people before a ticket is written.</p>
+      <div class="f">Maker-checker: 0/2 → 1/2 → 2/2</div></div>
+  </div>
+  <div class="banner sm" style="position:absolute;left:48px;right:48px;bottom:74px">
+    The domain heuristic lives in a cited, versioned rule—not in the planner prompt
+  </div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="app/names.py · data/ontology.json · data/cases.json · app/authority.py · tests/test_expert_rule.py">
+    This is a synthetic analyst heuristic: expert provenance is demo metadata, not evidence of a real bank's approval.
+    Vietnamese diacritics distinguish people; the remedy is re-capture and re-verification, not auto-clear.
+    Show KYC-1046's authority card with two approvers. On KYC-1043 the re-upload has one analyst approval.
   </aside>
 </section>
 
 <!-- ============================== 11 DEBUG + VALIDATION ============================== -->
 <section class="slide">
   <div class="kicker">Highlights</div>
-  <h1>A debugging habit and a failure taxonomy — one per layer</h1>
+  <h1>60 labelled cases: governed outcomes vs generic LLM + RAG</h1>
   <div class="body">
-    <div class="chain" style="justify-content:flex-start;gap:0">
-      <div class="cnode">REPLAY</div><div class="arw">→</div>
-      <div class="cnode">LOCALIZE</div><div class="arw">→</div>
-      <div class="cnode">MEASURE</div><div class="arw">→</div>
-      <div class="cnode">REGRESS</div>
+    <div class="split" style="gap:20px">
+      <div class="card"><div class="k">Governed · gpt-4o-mini</div><div class="metric-big">100%</div>
+        <p>Outcome + rule agreement · 0 unsafe decisions · 0 unapproved writes. Model alone proposed the labelled outcome on 80%.</p></div>
+      <div class="card alert"><div class="k">Generic LLM + RAG · same model</div><div class="metric-big alert">71.7%</div>
+        <p>Outcome agreement · 2 unsafe decisions (one sanctions, one missing-evidence) · 48 counterfactual unapproved writes.</p></div>
     </div>
-    <table class="grid dense" style="margin-top:22px">
-      <colgroup><col style="width:14%"><col style="width:36%"><col style="width:50%"></colgroup>
-      <thead><tr><th>Layer</th><th>Example failure</th><th>Response</th></tr></thead>
-      <tbody>
-        <tr><td>Retrieval</td><td>Irrelevant policy chunk</td><td>Rerank and filter</td></tr>
-        <tr><td>Planning</td><td>Hallucinated outcome</td><td>Prompt / model regression</td></tr>
-        <tr><td>Injection</td><td>Case note instructs the model</td><td class="stop">Guardrail override — already enforced</td></tr>
-        <tr><td>Tool</td><td>Timeout or schema violation</td><td>Retry with a budget</td></tr>
-        <tr><td>Action</td><td>Duplicate ticket after a retry</td><td>Return the prior result</td></tr>
-      </tbody>
-    </table>
+    <div class="cards c3" style="margin-top:20px;gap:14px">
+      <div class="card" style="padding:18px"><div class="k">Coverage</div><h3>60 cases · 12 categories</h3><p>10 adversarial notes · sanctions edge cases · OCR boundary cases.</p></div>
+      <div class="card" style="padding:18px"><div class="k">Operational estimate</div><h3>546 / 900 minutes saved</h3><p>Assumption-based scenario estimate, not measured customer productivity.</p></div>
+      <div class="card" style="padding:18px"><div class="k">Local 7–8B</div><h3>Not benchmarked locally</h3><p>Hosted Qwen 7B/8B: 0/10 valid structured proposals each in a limited probe.</p></div>
+    </div>
   </div>
-  <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:74px">
-    Every failure becomes a regression case · 139 unit tests + 19 deterministic evals · no live model call in CI
+  <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:64px">
+    One live snapshot, 2026-09-27; baseline sampling varies. Label agreement ≠ production accuracy; no customer data.
   </div>
   <div class="pagenum">11 / 12</div>
   <aside class="notes" data-src="evals/run_evals.py · tests/test_agent.py · docs/ARCHITECTURE.md (failure taxonomy)">
-    Tell the concrete debugging story rather than the abstract loop. An early design could combine untrusted note
-    text with a notification action; the fix was structural — read/write separation and a stop rule outside the
-    model — and then it became a permanent eval. A taxonomy beats a raw test count: each layer has a detection
-    signal and a defined response. CI uses deterministic eval doubles; a separate opt-in smoke command checks the
-    live provider path.
+    Source: docs/results/2026-09-27-scorecard-gpt-4o-mini.md, run with --planner normal --baseline. 60 synthetic
+    labels were authored by scenario category, not by asking the rule interpreter. The baseline's 48 unapproved
+    writes are counterfactual would_execute values, not real gateway writes. 546 minutes saved is an explicit
+    hypothetical time model; do not describe it as measured. Hosted 7–8B failures do not support parity claims.
+  </aside>
+</section>
+
+<!-- ============================== REFLECT ============================== -->
+<section class="slide">
+  <div class="kicker">Reflect · evidence-led change</div>
+  <h1>Review rejection → candidate → replay → quorum → promotion</h1>
+  <div class="body split" style="grid-template-columns:1.15fr .85fr;gap:24px;height:465px;margin-top:24px">
+    <img class="demo-shot" src="assets/reflect-impact.webp" alt="Reflect and Assurance console with candidate diff and replay impact">
+    <div class="stack" style="gap:12px">
+      <div class="card" style="padding:15px"><div class="k">Reject KYC-1043</div><h3>Tamper 0.09 is borderline</h3><p>Draft R-ID-EXP-01@1.1: max_tamper 0.10 → 0.09.</p></div>
+      <div class="card" style="padding:15px"><div class="k">Replay 65 cases</div><h3>1 tightened · 0 safety regressions</h3><p>Promote only after KYC Lead + Compliance (two roles).</p></div>
+      <div class="card alert" style="padding:15px"><div class="k">Unsafe alternative</div><h3>Sanctions threshold 0.95: BLOCKED</h3><p>Replay detects 9 regressions; no activation.</p></div>
+    </div>
+  </div>
+  <div class="banner xs" style="position:absolute;left:48px;right:48px;bottom:60px">
+    Promotion is in-process demo state under .runtime/ontology/; not a production governance platform
+  </div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="app/reflect.py · app/ontology.py · docs/DEMO_RUNBOOK.md · tests/test_reflect.py">
+    Reject KYC-1043 and draft by deterministic rule narrowing. Replay on 60 golden + 5 shipped cases.
+    Reviewer identities are demo inputs, not real identity verification; change approval requires two distinct roles.
+    The diff on the screenshot is a previous session. Reset to shipped ontology before each presentation.
   </aside>
 </section>
 
@@ -646,7 +674,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 
 <div id="notespane"><h5>SPEAKER NOTES</h5><div id="notestext"></div><div class="src" id="notessrc"></div></div>
 <div id="hud">
-  <span id="counter">1 / 13</span>
+  <span id="counter">1 / 14</span>
   <button id="prev" title="Previous (←)">‹</button>
   <button id="next" title="Next (→)">›</button>
   <button id="ntoggle" title="Speaker notes (N)">N</button>
@@ -655,6 +683,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 
 <script>
 const slides = [...document.querySelectorAll('.slide')];
+slides.forEach((slide, i) => { const number = slide.querySelector('.pagenum'); if (number) number.textContent = `${String(i + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`; });
 const stage = document.getElementById('stage');
 const pane = document.getElementById('notespane');
 let idx = 0;

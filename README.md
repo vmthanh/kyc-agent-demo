@@ -47,11 +47,13 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 |---|---|
 | Structural ontology | `data/ontology.json` → `structural` (entities, relations) |
 | Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules (policy- and expert-sourced, e.g. `R-ID-EXP-01`) interpreted by `app/ontology.py` |
+| Dana Factory (analogy) | `app/reflect.py` drafts candidate amendments; **document-to-rule curation is not built** |
+| Dana Runtime (analogy) | `app/workflow/` + `app/authority.py` govern decisions, read/write separation and approvals |
 | Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → approvals per the ontology's authority matrix (`app/authority.py`: risk-tiered, maker-checker, role separation) → idempotent gateway |
 | Dana Assurance | `app/reflect.py`: reviewer signal → candidate rule (rule-narrowing or LLM drafter) → loader validation → replay over 65 golden + shipped cases → blocked on any safety regression → approval by KYC Lead/Compliance → promoted ontology under `.runtime/ontology/` with an append-only audit log; `evals/scorecard.py` for model/agent quality |
 | See → Think → Act → Reflect | every trace event carries `phase`; governed steps carry `gov_stage` (PROPOSE/VERIFY/COMMIT); `AgentDecision.governance` counts reads, writes, approvals, overrides |
 | Sovereign / small models | `planner_mode=local` against an OpenAI-compatible endpoint (Ollama, LM Studio, vLLM); same ontology guard and approval path |
-| Vertical packs | *planned*: `packs/kyc`, `packs/boiler` |
+| Vertical packs | **Not built**: the runtime is KYC-specific; extracting packs and a second domain are P2 work |
 
 ## Architecture and stack
 
@@ -99,7 +101,7 @@ tests/
 docs/
   INTERVIEW_GUIDE.md, ARCHITECTURE.md, PRODUCTION_ROADMAP.md, ROUNDS_2_AND_3.md
 slides/
-  index.html     the interview deck: 20 HTML slides, speaker notes, print/export modes
+  index.html     the interview deck: 14 HTML slides, speaker notes, print/export modes
   to_pptx.py     renders index.html to slides/deck.pptx (Chrome + python-pptx)
 ```
 
@@ -156,10 +158,11 @@ uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 
 ## Present the deck
 
-`slides/index.html` is the source of truth for the presentation -- open it in
-any browser and present from it directly. Narrative order: problem -> why the
-usual approaches fail -> architecture -> tech stack -> highlights -> benefits
-and conclusion. Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
+`slides/index.html` is the source of truth for the 14-slide presentation (includes
+committed screenshots under `slides/assets/`) -- open it in
+any browser and present from it directly. Narrative order: problem →
+DanaOS-style mapping → executable ontology → governed authority → generic RAG
+comparison → expert heuristic → measured scorecard → Reflect → limitations. Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
 (all slides stacked, print-ready), `F` fullscreen.
 
 Export, when a file is needed instead of a browser:
@@ -172,12 +175,13 @@ Export, when a file is needed instead of a browser:
 ```
 
 ```bash
-python3 slides/to_pptx.py     # -> slides/deck.pptx, 13.333x7.5in, speaker notes included
+uv run --with python-pptx python slides/to_pptx.py  # -> slides/deck.pptx, speaker notes included
 ```
 
 `to_pptx.py` embeds each slide as a 2560x1440 image, so the result is
 pixel-identical to the browser but *not* text-editable in PowerPoint -- edit
-`slides/index.html` and re-export. It writes `slides/deck.pptx` and leaves
+`slides/index.html` and re-export. The generated `slides/deck.pptx` is gitignored;
+create it locally from the committed HTML and assets. It leaves
 `Thanh_Vo_KYC_Agent_Demo.pptx` (the older, natively-editable deck) alone.
 
 ## Run the rich demo (LangGraph interrupt UI + MLflow tracing)
@@ -258,12 +262,11 @@ uv run python -m unittest discover -s tests -v
 uv run python -m evals.run_evals
 ```
 
-139 unit tests (policy branch coverage, graph routes, tool idempotency,
-planner-failure resilience, end-to-end runs, i18n rendering, the mocked
-OpenRouter adapter, relocalization, concurrency, FastAPI route/error
-contracts, the Redis/memory checkpointer fallback, and the HTTP client) and
-19 deterministic scenario/safety checks, including the compromised-proposal
-guardrail route and Vietnamese rendering.
+231 unit tests (including ontology validation, expert-rule boundaries, graph
+routes, authority quorum, Reflect replay, mocked local/OpenRouter adapters,
+scorecard integrity, API contracts and presentation assets) and 24
+deterministic scenario/safety checks. Run the commands above to get the
+current counts; these may grow with future changes.
 
 **Honest scope note:** CI uses deterministic eval doubles and a mocked
 OpenRouter transport so tests do not require a network or credential. A live
