@@ -23,10 +23,31 @@
   },
   "constraints": [
     "hard_stop rules carry no action and must precede every non-hard-stop rule",
-    "all write actions -> human approval + idempotency key",
+    "all write actions -> human approval per the authority matrix + idempotency key",
     "every resolution -> rule id@version + policy citation + evidence lineage + model attribution",
     "case_note is untrusted free text -> never an input to rule evaluation, only planner context"
   ],
+  "authority": {
+    "roles": ["analyst", "kyc_lead", "compliance"],
+    "actions": {
+      "request_document": {
+        "approvals": 1, "roles": ["analyst", "kyc_lead", "compliance"],
+        "note": "customer contact with the exact requested documents",
+        "by_risk": {"HIGH": {"approvals": 2, "note": "maker-checker for high-risk customers"}}
+      },
+      "open_manual_review": {
+        "approvals": 1, "roles": ["analyst", "kyc_lead", "compliance"],
+        "by_risk": {
+          "HIGH": {"approvals": 2, "note": "maker-checker for high-risk identity conflicts"},
+          "CRITICAL": {"approvals": 2, "roles": ["kyc_lead", "compliance"], "distinct_roles": true}
+        }
+      },
+      "promote_amendment": {
+        "approvals": 2, "roles": ["kyc_lead", "compliance"], "distinct_roles": true,
+        "note": "ontology changes need one KYC Lead and one Compliance approval"
+      }
+    }
+  },
   "cognitive": {
     "fact_sources": ["get_case", "verify_documents", "screen_sanctions", "get_risk_profile"],
     "actions": ["request_document", "open_manual_review"],

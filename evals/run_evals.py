@@ -36,9 +36,17 @@ def main() -> None:
     manual_agent = KYCExceptionAgent()
     manual = manual_agent.run("KYC-1046", planner=PolicyMatchingEvalPlanner())
     checks.append(("KYC-1046: real mismatch stays MANUAL_REVIEW (expert rule bounded)", manual.outcome == Outcome.MANUAL_REVIEW))
-    manual_finished = manual_agent.approve(manual.pending_task.interrupt_key)
+    manual_half = manual_agent.approve(manual.pending_task.interrupt_key, approver="an.nguyen", role="analyst")
+    checks.append(("KYC-1046: HIGH risk needs maker-checker (1/2 does not execute)", manual_half.executed_action is None))
+    try:
+        manual_agent.approve(manual_half.pending_task.interrupt_key, approver="an.nguyen", role="analyst")
+        same_person_blocked = False
+    except ValueError:
+        same_person_blocked = True
+    checks.append(("KYC-1046: same approver twice is refused", same_person_blocked))
+    manual_finished = manual_agent.approve(manual_half.pending_task.interrupt_key, approver="lan.pham", role="kyc_lead")
     checks += [
-        ("KYC-1046: action approval", manual_finished.executed_action is not None),
+        ("KYC-1046: action approval (2 distinct approvers)", manual_finished.executed_action is not None),
         ("KYC-1046: no pending task", manual_finished.pending_task is None),
     ]
 

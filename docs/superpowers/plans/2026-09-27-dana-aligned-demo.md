@@ -207,13 +207,13 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 **Files:** `data/ontology.json` (`authority` section), `app/workflow/nodes.py` (`action_review`), `app/domain.py`, tests
 
-- [ ] `authority`: `request_document → 1 approver (analyst)`; `open_manual_review → maker-checker (2 distinct approvers)`;
+- [x] `authority`: `request_document → 1 approver (analyst)`; `open_manual_review → maker-checker (2 distinct approvers)`;
       `promote_amendment → 2 of {kyc_lead, compliance}`. Sanctions stays "no automated action" (unchanged).
-- [ ] `action_review` loops the interrupt until quorum is met; resume payload gains `approver` (required, distinct).
+- [x] `action_review` loops the interrupt until quorum is met; resume payload gains `approver` (required, distinct).
       Pending task payload shows `approvals: 1/2`.
-- [ ] Idempotency key unchanged (payload-based); approvals recorded in trace with approver ids.
-- [ ] Tests: same approver twice doesn't satisfy maker-checker; one rejection ends review.
-- [ ] Commit: `feat: ontology-defined authority matrix with maker-checker quorum`.
+- [x] Idempotency key unchanged (payload-based); approvals recorded in trace with approver ids.
+- [x] Tests: same approver twice doesn't satisfy maker-checker; one rejection ends review.
+- [x] Commit: `feat: ontology-defined authority matrix with maker-checker quorum`.
 
 ### Task 9: Sovereign / small-model option
 

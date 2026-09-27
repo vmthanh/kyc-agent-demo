@@ -120,10 +120,18 @@ if decision is not None:
             )
             st.caption(f"Pending case: {decision.case_id}")
             st.json(decision.approval.payload.get("action_payload", decision.approval.payload))
+            authority = decision.pending_task.payload.get("authority") or {}
+            so_far = authority.get("approvals_so_far", [])
+            if authority:
+                st.caption(f"Authority: {len(so_far)}/{authority.get('approvals', 1)} approvals · roles {', '.join(authority.get('roles', []))}"
+                           + "".join(f"  \n✓ {a['approver']} ({a['role']})" for a in so_far))
+            approver = st.text_input("Approver", value="lan.pham" if so_far else "an.nguyen", key=f"approver-{len(so_far)}")
+            roles = authority.get("roles") or ["analyst"]
+            role = st.selectbox("Role", roles, index=roles.index("kyc_lead") if so_far and "kyc_lead" in roles else 0, key=f"role-{len(so_far)}")
             if st.button(i18n.ui_text(lang, "approve_button")):
                 try:
                     st.session_state.decision = client.resume(
-                        decision.pending_task.interrupt_key, {"approved": True}, lang=lang
+                        decision.pending_task.interrupt_key, {"approved": True, "approver": approver, "role": role}, lang=lang
                     )
                     st.rerun()
                 except KYCAPIError as exc:

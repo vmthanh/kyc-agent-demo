@@ -14,6 +14,7 @@ from langgraph.types import interrupt
 
 from ..domain import LLMProposal, Outcome, PolicyCitation
 from ..planner import Planner, PlannerUnavailableError
+from ..authority import check_approval, normalize, requirement, satisfied
 from ..ontology import load_ontology
 from ..policy import PolicyVerdict, evaluate, guard_verdict, tags_for
 from ..tools import DomainTools, action_idempotency_key
@@ -328,32 +329,48 @@ class WorkflowNodes:
 
     def action_review(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
         """Pause before a write, presenting the exact bounded payload to a reviewer."""
-        payload = (state.get("decision") or {}).get("action_payload")
+        decision = state.get("decision") or {}
+        payload = decision.get("action_payload")
         if not isinstance(payload, dict):
             raise ValueError("action_payload is required for approval")
-        response = interrupt({
-            "kind": "action_approval",
-            "case_id": state["case_id"],
-            "run_id": state["run_id"],
-            "message_key": "approve_prompt",
-            "action_payload": payload,
-            "allowed_responses": ["approve", "reject"],
-        })
-        if not isinstance(response, dict) or not isinstance(response.get("approved"), bool):
-            raise ValueError("approval response must include a boolean approved field")
-        if not response["approved"] and not str(response.get("reason", "")).strip():
-            raise ValueError("rejection reason is required")
-        review = {"approved": response["approved"]}
+        # The ontology's authority matrix says how many approvals, from which roles.
+        # Each approval is one interrupt; on resume LangGraph replays earlier
+        # answers in order, so `approvals` is rebuilt deterministically.
+        req = requirement(load_ontology().authority, payload["action"], decision.get("risk_level")).to_payload()
+        approvals: list[dict[str, Any]] = []
+        while True:
+            response = interrupt({
+                "kind": "action_approval",
+                "case_id": state["case_id"],
+                "run_id": state["run_id"],
+                "message_key": "approve_prompt",
+                "action_payload": payload,
+                "authority": {**req, "approvals_so_far": list(approvals)},
+                "allowed_responses": ["approve", "reject"],
+            })
+            if not isinstance(response, dict) or not isinstance(response.get("approved"), bool):
+                raise ValueError("approval response must include a boolean approved field")
+            if not response["approved"]:
+                if not str(response.get("reason", "")).strip():
+                    raise ValueError("rejection reason is required")
+                break
+            approvals.append(check_approval(req, approvals, response))
+            if satisfied(req, approvals):
+                break
+        review: dict[str, Any] = {"approved": response["approved"], "approvals": approvals}
         if not response["approved"]:
             review["reason"] = str(response["reason"]).strip()
+            review["rejected_by"] = normalize(response)
+        who = ", ".join(f"{a['approver']} ({a['role']})" for a in approvals)
         update = {
             "review_result": review,
             "action_payload": payload,
             "current_node": "action_review",
             "trace": [self._event(
                 state, "action_review", "Human action review",
-                "Action approval recorded" if response["approved"] else f"Reviewer rejected: {review['reason']}",
-                runtime=runtime, metadata={"approved": response["approved"]},
+                f"Approved {len(approvals)}/{req['approvals']}: {who}" if response["approved"] else f"Reviewer rejected: {review['reason']}",
+                runtime=runtime, metadata={"approved": response["approved"], "approvals": approvals,
+                                           "required": req["approvals"]},
             )],
         }
         if not response["approved"]:
@@ -368,6 +385,9 @@ class WorkflowNodes:
         if not isinstance(payload, dict):
             raise ValueError("action_payload is required for execution")
         result = self.tools.execute_approved_action(payload, action_idempotency_key(payload))
+        # Approvers are recorded on the result, outside the idempotency key: the
+        # same approved payload always maps to the same ticket.
+        result = {**result, "approved_by": list(review.get("approvals") or [])}
         update = {
             "action_result": result,
             "trace": [self._event(state, "execute_action", "Execute approved action", "Action gateway completed", runtime=runtime)],

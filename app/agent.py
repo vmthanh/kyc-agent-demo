@@ -9,6 +9,7 @@ from langgraph.types import Command
 
 from . import i18n
 from .domain import AgentDecision, ApprovalRequest, LLMProposal, Outcome, PendingTask, PendingTaskKind, PolicyCitation, ToolCall, TraceEvent, WorkflowStatus
+from .authority import check_approval
 from .ontology import load_ontology
 from .planner import Planner, select_planner
 from .reflect import ReflectStore
@@ -70,6 +71,10 @@ class KYCExceptionAgent:
                     raise ValueError("approval response must include a boolean approved field")
                 if response["approved"] is False and not str(response.get("reason", "")).strip():
                     raise ValueError("rejection reason is required")
+                authority = (pending.get("value") or {}).get("authority")
+                if response["approved"] and authority:
+                    # Reject a disallowed approval here, before it reaches the graph.
+                    check_approval(authority, authority.get("approvals_so_far", []), response)
             elif kind == PendingTaskKind.OPERATIONAL_REVIEW.value:
                 if not isinstance(response, dict) or response.get("acknowledged") is not True:
                     raise ValueError("operational review requires acknowledgement")
@@ -79,8 +84,14 @@ class KYCExceptionAgent:
             self._cache_result(pending["decision_id"], pending["case_id"], result, pending["config"], pending["graph"])
             return self._to_decision(pending["case_id"], result, pending["config"], pending["graph"], lang or result.get("lang", "en"), pending["decision_id"])
 
-    def approve(self, approval_key: str, lang: str | None = None) -> AgentDecision:
-        return self.resume(approval_key, {"approved": True}, lang=lang)
+    def approve(self, approval_key: str, lang: str | None = None, approver: str | None = None,
+                role: str | None = None) -> AgentDecision:
+        response: dict[str, Any] = {"approved": True}
+        if approver:
+            response["approver"] = approver
+        if role:
+            response["role"] = role
+        return self.resume(approval_key, response, lang=lang)
 
     def reject(self, approval_key: str, reason: str, lang: str | None = None) -> AgentDecision:
         reason = reason.strip()
@@ -202,7 +213,8 @@ class KYCExceptionAgent:
             "proposals": count("openrouter_reason", lambda e: e.get("status") == "complete"),
             "verifications": count("reconcile_guard"),
             "overrides": count("reconcile_guard", lambda e: e.get("status") == "override"),
-            "approvals": count("action_review", lambda e: (e.get("metadata") or {}).get("approved") is True),
+            "approvals": sum(len((e.get("metadata") or {}).get("approvals") or [None])
+                             for e in trace if e.get("step") == "action_review" and (e.get("metadata") or {}).get("approved") is True),
             "rejections": count("action_review", lambda e: (e.get("metadata") or {}).get("approved") is False),
             "writes": count("execute_action", lambda e: e.get("status") == "complete"),
         }

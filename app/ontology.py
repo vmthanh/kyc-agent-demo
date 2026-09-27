@@ -115,6 +115,7 @@ class Ontology:
         self.all_rules = all_rules
         self.rules = tuple(sorted((r for r in all_rules if r.status == "active"), key=lambda r: r.priority))
         self.raw: dict[str, Any] = {}
+        self.authority: dict[str, Any] = {}
 
     # ------------------------------------------------------------------ load
     @classmethod
@@ -145,6 +146,15 @@ class Ontology:
 
         onto = cls(version, entities, relations, fact_sources, actions, base_tags, tuple(rules))
         _check_active_set(onto.rules)
+        authority = data.get("authority")
+        if authority is not None:
+            from .authority import validate_matrix
+
+            try:
+                validate_matrix(authority, actions)
+            except ValueError as exc:
+                raise OntologyError(f"authority: {exc}") from exc
+        onto.authority = copy.deepcopy(authority or {})
         onto.raw = copy.deepcopy(data)
         return onto
 

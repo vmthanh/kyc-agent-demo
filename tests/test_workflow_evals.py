@@ -88,9 +88,15 @@ class WorkflowEvalDoubleTests(unittest.TestCase):
         first = agent.run("KYC-1046", planner=PolicyMatchingEvalPlanner())
         self.assertEqual(first.outcome, Outcome.MANUAL_REVIEW)
         self.assertEqual(first.pending_task.kind, PendingTaskKind.ACTION_APPROVAL)
-        finished = agent.approve(first.pending_task.interrupt_key)
+        # HIGH-risk identity conflict: the authority matrix requires maker-checker (2 distinct approvers).
+        self.assertEqual(first.pending_task.payload["authority"]["approvals"], 2)
+        halfway = agent.approve(first.pending_task.interrupt_key, approver="an.nguyen", role="analyst")
+        self.assertIsNone(halfway.executed_action)
+        self.assertEqual(halfway.pending_task.payload["authority"]["approvals_so_far"], [{"approver": "an.nguyen", "role": "analyst"}])
+        finished = agent.approve(halfway.pending_task.interrupt_key, approver="lan.pham", role="kyc_lead")
         self.assertEqual(finished.outcome, Outcome.MANUAL_REVIEW)
         self.assertEqual(finished.executed_action["status"], "executed")
+        self.assertEqual([a["approver"] for a in finished.executed_action["approved_by"]], ["an.nguyen", "lan.pham"])
         self.assertIsNone(finished.pending_task)
 
     def test_compromised_and_unavailable_sanctions_paths_are_strict(self) -> None:

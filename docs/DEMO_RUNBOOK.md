@@ -58,6 +58,12 @@ If a batch shows 0 unsafe runs, click again and say so honestly.
 **③ Showing the expert rule is bounded (KYC-1046)**
 - **Run agent** on KYC-1046 (a different person). It stays `MANUAL_REVIEW` via `R-ID-01`.
 
+Then point at **Authority 0/2 · maker-checker**: KYC-1046 is HIGH risk, so the
+ontology's authority matrix requires two different approvers. Approve as
+`an.nguyen (analyst)` → **1/2**, nothing executes; approve again as
+`lan.pham (kyc_lead)` → ticket executed, `approved_by` lists both. Trying the
+same person twice is refused.
+
 **④ Full evidence loop (KYC-1042)**
 - **Run** → **Approve** → **Submit**. It clears on cycle 2.
 - Point at the governance counters (reads 8, approvals 1, writes 1).
@@ -77,8 +83,9 @@ uv run python -m app.cli --case KYC-1043 --planner normal --approve --submit-req
 uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-requested-documents \
   | sed -n '/^{/,$p' | jq "$F"
 
-# Real name mismatch → manual review
-uv run python -m app.cli --case KYC-1046 --planner normal | sed -n '/^{/,$p' | jq "$F"
+# Real name mismatch → manual review, maker-checker (two approvers from --approvers)
+uv run python -m app.cli --case KYC-1046 --planner normal --approve \
+  | jq '{outcome, status: .workflow_status, approved_by: .executed_action.approved_by}'
 
 # Compromised model → still BLOCKED
 uv run python -m app.cli --case KYC-1044 --planner compromised_demo | sed -n '/^{/,$p' | jq "$F"
@@ -122,7 +129,9 @@ Then say: "that's exactly why rule changes need a promotion gate". That gate is 
    A yellow hint says the reviewer signal was captured.
 3. **Reflect & Assurance** tab → the signal `SIG-001` → **Draft (rule narrowing)**.
    The candidate is `R-ID-EXP-01@1.1` with `max_tamper 0.10 → 0.09`; replay: 65 cases, 1 tightened, 0 regressions.
-4. **Approve** as `kyc_lead` (an `analyst` role is refused) → status **PROMOTED**, ontology **v2.1**.
+4. **Approve** as `lan.pham (kyc_lead)` → **1/2**, still proposed; then **Approve** as
+   `hoa.tran (compliance)` → **PROMOTED**, ontology **v2.1**. (An `analyst`, or a second
+   `kyc_lead`, is refused: promotion needs one KYC Lead + one Compliance.)
 5. Back in **Agent**, run KYC-1043 again → now `MANUAL_REVIEW` via `R-ID-01`.
 6. **Try an unsafe amendment** → R-AML-01 threshold 0.95 → **BLOCKED**, 9 safety regressions (G-001…G-009 incl. KYC-1044).
 7. **Reset to shipped ontology** before the next run-through.

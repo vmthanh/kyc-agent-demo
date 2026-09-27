@@ -52,6 +52,11 @@ class ReflectStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "role"):
             self.store.approve(amendment.id, "an.nguyen", "analyst")
         self.store.approve(amendment.id, "lan.pham", "kyc_lead")
+        self.assertEqual(amendment.status, "proposed")  # 1 of 2: KYC Lead alone cannot change the ontology
+        with self.assertRaisesRegex(ValueError, "role"):
+            self.store.approve(amendment.id, "minh.le", "kyc_lead")
+        self.assertEqual(load_ontology().rule("R-ID-EXP-01").version, "1.0")
+        self.store.approve(amendment.id, "hoa.tran", "compliance")
         self.assertEqual(amendment.status, "promoted")
         self.assertEqual(load_ontology().rule("R-ID-EXP-01").ref, "R-ID-EXP-01@1.1")
         self.assertTrue((self.tmp / "ontology-v2.1.json").exists())
@@ -115,8 +120,13 @@ class ReflectAPITests(unittest.TestCase):
         (signal,) = self.client.get("/api/reflect/signals").json()
         amendment = self.client.post("/api/amendments", json={"signal_id": signal["id"]}).json()
         self.assertEqual(amendment["status"], "proposed")
+        first = self.client.post(f"/api/amendments/{amendment['id']}/review",
+                                 json={"approver": "lan.pham", "role": "kyc_lead"}).json()
+        self.assertEqual(first["status"], "proposed")
+        same_role = self.client.post(f"/api/amendments/{amendment['id']}/review", json={"approver": "x", "role": "kyc_lead"})
+        self.assertEqual((same_role.status_code, set(same_role.json())), (400, {"error"}))
         reviewed = self.client.post(f"/api/amendments/{amendment['id']}/review",
-                                    json={"approver": "lan.pham", "role": "kyc_lead"}).json()
+                                    json={"approver": "hoa.tran", "role": "compliance"}).json()
         self.assertEqual(reviewed["status"], "promoted")
         onto = self.client.get("/api/ontology").json()
         self.assertEqual((onto["version"], onto["promoted"]), ("2.1", True))

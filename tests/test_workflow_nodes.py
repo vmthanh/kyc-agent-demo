@@ -137,9 +137,12 @@ class WorkflowHumanNodeTests(unittest.TestCase):
     @patch("app.workflow.nodes.interrupt", return_value={"approved": False, "reason": "Need a newer document"})
     def test_rejection_records_reason_without_executing(self, mocked_interrupt) -> None:
         update = self.nodes.action_review(self.state)
-        self.assertEqual(update["review_result"], {"approved": False, "reason": "Need a newer document"})
+        self.assertEqual(update["review_result"], {"approved": False, "reason": "Need a newer document", "approvals": [],
+                                                   "rejected_by": {"approver": "reviewer", "role": "analyst"}})
         self.assertIsNone(update.get("action_result"))
-        mocked_interrupt.assert_called_once_with({
+        mocked_interrupt.assert_called_once()
+        sent = mocked_interrupt.call_args.args[0]
+        self.assertEqual({k: sent[k] for k in ("kind", "case_id", "run_id", "message_key", "action_payload", "allowed_responses")}, {
             "kind": "action_approval",
             "case_id": "KYC-1042",
             "run_id": "run-1",
@@ -147,11 +150,12 @@ class WorkflowHumanNodeTests(unittest.TestCase):
             "action_payload": self.state["decision"]["action_payload"],
             "allowed_responses": ["approve", "reject"],
         })
+        self.assertEqual((sent["authority"]["approvals"], sent["authority"]["approvals_so_far"]), (1, []))
 
     @patch("app.workflow.nodes.interrupt", return_value={"approved": True})
     def test_approval_keeps_exact_payload_for_execution(self, mocked_interrupt) -> None:
         update = self.nodes.action_review(self.state)
-        self.assertEqual(update["review_result"], {"approved": True})
+        self.assertEqual(update["review_result"], {"approved": True, "approvals": [{"approver": "reviewer", "role": "analyst"}]})
         self.assertEqual(update["action_payload"], self.state["decision"]["action_payload"])
 
     @patch("app.workflow.nodes.interrupt", return_value={"approved": False, "reason": "   "})
@@ -167,7 +171,7 @@ class WorkflowHumanNodeTests(unittest.TestCase):
             update = self.nodes.execute_action(state)
         execute.assert_called_once()
         self.assertEqual(execute.call_args.args[0], self.state["decision"]["action_payload"])
-        self.assertEqual(update["action_result"], {"status": "executed"})
+        self.assertEqual(update["action_result"], {"status": "executed", "approved_by": []})
 
     @patch("app.workflow.nodes.interrupt", return_value={
         "documents": [{"type": "proof_of_address", "status": "verified"}]

@@ -16,11 +16,15 @@ def main() -> None:
     )
     parser.add_argument("--lang", choices=["en", "vi"], default="en", help="Display language for the decision.")
     resolution = parser.add_mutually_exclusive_group()
-    resolution.add_argument("--approve", action="store_true", help="Auto-approve the proposed action, if any.")
+    resolution.add_argument("--approve", action="store_true", help="Approve the proposed action, if any (as many approvers as the authority matrix requires).")
     resolution.add_argument("--reject", metavar="REASON", help="Reject the proposed action with an audit reason.")
     parser.add_argument(
         "--submit-requested-documents", "--submit-proof-of-address", dest="submit_documents", action="store_true",
         help="Submit the requested documents as verified after approving the evidence request.",
+    )
+    parser.add_argument(
+        "--approvers", default="an.nguyen:analyst,lan.pham:kyc_lead,hoa.tran:compliance",
+        help="Comma-separated approver:role list used in order until the authority requirement is met.",
     )
     parser.add_argument(
         "--acknowledge-handoff", action="store_true",
@@ -31,7 +35,15 @@ def main() -> None:
     agent = KYCExceptionAgent()
     decision = agent.run(args.case, planner_mode=args.planner, lang=args.lang)
     if args.approve and decision.pending_task and decision.pending_task.kind is PendingTaskKind.ACTION_APPROVAL:
-        decision = agent.resume(decision.pending_task.interrupt_key, {"approved": True}, lang=args.lang)
+        for entry in [e for e in args.approvers.split(",") if e.strip()]:
+            if not (decision.pending_task and decision.pending_task.kind is PendingTaskKind.ACTION_APPROVAL):
+                break
+            approver, _, role = entry.strip().partition(":")
+            allowed = decision.pending_task.payload.get("authority", {}).get("roles", [role])
+            if role not in allowed:
+                continue
+            decision = agent.resume(decision.pending_task.interrupt_key,
+                                    {"approved": True, "approver": approver, "role": role}, lang=args.lang)
         if args.submit_documents and decision.pending_task and decision.pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION:
             requested = decision.pending_task.payload.get("requested_documents", [])
             decision = agent.resume(

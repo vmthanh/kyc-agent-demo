@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from . import ontology as ontology_module
+from .authority import check_approval, requirement, satisfied
 from .ontology import Ontology, OntologyError, load_ontology
 from .tools import DomainTools
 
@@ -249,8 +250,6 @@ class ReflectStore:
     audit log; promoted ontologies are written under `store_dir`, never over the
     shipped `data/ontology.json`."""
 
-    PROMOTER_ROLES = {"kyc_lead", "compliance"}
-
     def __init__(self, store_dir: Path | None = None, replay_sources: list[tuple[str, Path]] | None = None) -> None:
         self.store_dir = Path(store_dir or DEFAULT_STORE)
         self.replay_sources = replay_sources
@@ -321,21 +320,26 @@ class ReflectStore:
                 raise KeyError(f"Unknown or expired amendment: {amendment_id}")
             if amendment.status != "proposed":
                 raise ValueError(f"amendment is {amendment.status}; only proposed amendments can be approved")
-            if not approver.strip():
+            req = self.requirement()
+            granted = [a for a in amendment.approvals if a["approved"]]
+            if approved:
+                checked = check_approval(req, granted, {"approver": approver, "role": role})
+            elif not approver.strip():
                 raise ValueError("approver is required")
-            if role not in self.PROMOTER_ROLES:
-                raise ValueError(f"role {role!r} cannot approve ontology changes; need one of {sorted(self.PROMOTER_ROLES)}")
-            amendment.approvals.append({"approver": approver.strip(), "role": role, "approved": approved,
-                                        "reason": reason, "at": _now()})
+            else:
+                checked = {"approver": approver.strip(), "role": role}
+            amendment.approvals.append({**checked, "approved": approved, "reason": reason, "at": _now()})
             if not approved:
                 amendment.status = "rejected"
-            elif self._quorum_met(amendment):
+            elif satisfied(req, [a for a in amendment.approvals if a["approved"]]):
                 self._promote(amendment)
             self._audit("amendment_reviewed", {"amendment": amendment.id, "approver": approver, "role": role, "approved": approved})
             return amendment
 
-    def _quorum_met(self, amendment: Amendment) -> bool:
-        return any(a["approved"] for a in amendment.approvals)
+    @staticmethod
+    def requirement() -> dict[str, Any]:
+        """Who may promote an ontology change, from the *active* ontology's authority matrix."""
+        return requirement(load_ontology().authority, "promote_amendment").to_payload()
 
     def _promote(self, amendment: Amendment) -> None:
         current = load_ontology()

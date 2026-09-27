@@ -66,6 +66,8 @@ class ResumeRequest(_Body):
 class ApproveRequest(_Body):
     approval_key: str = Field(min_length=1)
     lang: str | None = None
+    approver: str | None = None
+    role: str | None = None
 
 
 class RejectRequest(_Body):
@@ -308,7 +310,7 @@ def resume(request: Request, body: ResumeRequest):
 
 @app.post("/api/approve", response_model=AgentDecision)
 def approve(request: Request, body: ApproveRequest):
-    return request.app.state.agent.approve(body.approval_key, lang=body.lang)
+    return request.app.state.agent.approve(body.approval_key, lang=body.lang, approver=body.approver, role=body.role)
 
 
 @app.post("/api/reject", response_model=AgentDecision)
