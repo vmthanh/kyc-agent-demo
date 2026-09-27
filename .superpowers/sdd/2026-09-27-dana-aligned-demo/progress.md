@@ -13,7 +13,7 @@ Baseline (2026-09-27): `uv run python -m unittest discover -s tests` → 139 tes
 | 5 P0 verification | ✅ done | eba5063 | 199 OK, evals 22/22 | live walkthrough all paths; fixed MLflow startup hang; see `task-5-report.md` |
 | **P0 phase** | ✅ **complete** | | | |
 | 6 Golden set + scorecard | ✅ done | e7230cb | 205 OK, evals 22/22 | live: governed 100%/0 unsafe vs baseline 71.7%/2 unsafe; see `task-6-report.md` |
-| 7 Reflect loop | ✅ done | see git log | 214 OK, evals 22/22 | signal→draft→replay→approve→promote; unsafe change blocked (9 regressions); see `task-7-report.md` |
+| 7 Reflect loop | ✅ done | f248c61 | 214 OK, evals 22/22 | signal→draft→replay→approve→promote; unsafe change blocked (9 regressions); see `task-7-report.md` |
 | 8 Authority matrix | ⏳ in progress | | | |
 | 9 Local small model | ⬜ todo | | | |
 | 10–13 (P2, wrap) | ⬜ todo | | | |
