@@ -48,7 +48,7 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 | Structural ontology | `data/ontology.json` → `structural` (entities, relations) |
 | Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules (policy- and expert-sourced, e.g. `R-ID-EXP-01`) interpreted by `app/ontology.py` |
 | Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → human-approved idempotent gateway |
-| Dana Assurance | *planned*: golden-set replay, impact report, gated rule promotion |
+| Dana Assurance | `app/reflect.py`: reviewer signal → candidate rule (rule-narrowing or LLM drafter) → loader validation → replay over 65 golden + shipped cases → blocked on any safety regression → approval by KYC Lead/Compliance → promoted ontology under `.runtime/ontology/` with an append-only audit log; `evals/scorecard.py` for model/agent quality |
 | See → Think → Act → Reflect | every trace event carries `phase`; governed steps carry `gov_stage` (PROPOSE/VERIFY/COMMIT); `AgentDecision.governance` counts reads, writes, approvals, overrides |
 | Sovereign / small models | *planned*: local planner mode |
 | Vertical packs | *planned*: `packs/kyc`, `packs/boiler` |

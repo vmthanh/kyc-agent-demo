@@ -30,8 +30,10 @@ This module is pure (no network, no model, no display language). It returns a
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -112,6 +114,7 @@ class Ontology:
         self.base_retrieval_tags = base_retrieval_tags
         self.all_rules = all_rules
         self.rules = tuple(sorted((r for r in all_rules if r.status == "active"), key=lambda r: r.priority))
+        self.raw: dict[str, Any] = {}
 
     # ------------------------------------------------------------------ load
     @classmethod
@@ -142,6 +145,7 @@ class Ontology:
 
         onto = cls(version, entities, relations, fact_sources, actions, base_tags, tuple(rules))
         _check_active_set(onto.rules)
+        onto.raw = copy.deepcopy(data)
         return onto
 
     # -------------------------------------------------------------- evaluate
@@ -388,9 +392,36 @@ def _apply(r: Rule, facts: dict[str, Any]) -> RuleMatch:
 
 
 # ------------------------------------------------------------------ loading
+_active_override: Path | None = None
+_active_lock = threading.Lock()
+
+
+def activate(path: str | Path) -> Ontology:
+    """Make a validated ontology file the process-wide active one (used by gated promotion)."""
+    global _active_override
+    onto = load_ontology(path)  # validate before switching
+    with _active_lock:
+        _active_override = Path(path)
+    return onto
+
+
+def reset_active() -> None:
+    global _active_override
+    with _active_lock:
+        _active_override = None
+
+
+def active_path() -> Path:
+    return Path(_active_override or os.environ.get(ONTOLOGY_PATH_ENV) or DEFAULT_PATH)
+
+
 def load_ontology(path: str | Path | None = None) -> Ontology:
-    """Load and validate an ontology. `KYC_ONTOLOGY_PATH` overrides the default file."""
-    resolved = Path(path or os.environ.get(ONTOLOGY_PATH_ENV) or DEFAULT_PATH)
+    """Load and validate an ontology.
+
+    Precedence: explicit `path` > a promoted ontology activated in-process >
+    `KYC_ONTOLOGY_PATH` > the shipped `data/ontology.json`.
+    """
+    resolved = Path(path) if path else active_path()
     return _load_cached(str(resolved.resolve()), resolved.stat().st_mtime_ns)
 
 

@@ -16,6 +16,7 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
@@ -24,10 +25,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from . import ontology as ontology_module
 from .agent import KYCExceptionAgent
 from .baseline import MAX_SAMPLES, BaselineRAGAgent, compare_samples, run_samples, select_baseline_planner
 from .checkpointing import make_checkpointer
 from .domain import AgentDecision
+from .reflect import LLMDrafter, NarrowingDrafter
 from .tools import DomainTools, ToolError
 
 logger = logging.getLogger(__name__)
@@ -81,6 +84,20 @@ class RejectRequest(_Body):
 class RelocalizeRequest(_Body):
     decision_id: str = Field(min_length=1)
     lang: str = "en"
+
+
+class AmendmentRequest(_Body):
+    signal_id: str | None = None
+    rule: dict[str, Any] | None = None
+    drafter: Literal["rules", "llm"] = "rules"
+    author: str = "fde"
+
+
+class AmendmentReview(_Body):
+    approver: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    approved: bool = True
+    reason: str = ""
 
 
 class CompareResponse(BaseModel):
@@ -225,6 +242,63 @@ def compare(request: Request, body: CompareRequest):
         samples = pending_baseline.result()
     baseline, comparison = compare_samples(samples, governed.outcome.value, governed.rule)
     return {"baseline": baseline, "governed": governed, "comparison": comparison}
+
+
+# ------------------------------------------------------------------ Reflect
+def _rule_summary(rule) -> dict[str, Any]:
+    return {"id": rule.id, "version": rule.version, "priority": rule.priority, "hard_stop": rule.hard_stop,
+            "status": rule.status, "cites": rule.cites, "params": rule.params, "description": rule.description,
+            "source": rule.source}
+
+
+@app.get("/api/ontology")
+def get_ontology() -> dict[str, Any]:
+    onto = ontology_module.load_ontology()
+    path = ontology_module.active_path().resolve()
+    return {"version": onto.version, "active_path": str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path),
+            "promoted": path != ontology_module.DEFAULT_PATH.resolve(), "rules": [_rule_summary(r) for r in onto.rules]}
+
+
+@app.get("/api/ontology/rules/{rule_id}")
+def get_rule(rule_id: str) -> dict[str, Any]:
+    """The full, raw rule JSON (the editable artifact a domain expert would change)."""
+    for rule in ontology_module.load_ontology().raw["cognitive"]["rules"]:
+        if rule["id"] == rule_id:
+            return rule
+    raise KeyError(f"Unknown or expired rule: {rule_id}")
+
+
+@app.post("/api/ontology/reset")
+def reset_ontology(request: Request) -> dict[str, Any]:
+    request.app.state.agent.reflect.reset()
+    return get_ontology()
+
+
+@app.get("/api/reflect/signals")
+def list_signals(request: Request) -> list[dict[str, Any]]:
+    return [asdict(s) for s in request.app.state.agent.reflect.signals.values()]
+
+
+@app.get("/api/amendments")
+def list_amendments(request: Request) -> list[dict[str, Any]]:
+    return [asdict(a) for a in request.app.state.agent.reflect.amendments.values()]
+
+
+@app.post("/api/amendments")
+def propose_amendment(request: Request, body: AmendmentRequest) -> dict[str, Any]:
+    if (body.signal_id is None) == (body.rule is None):
+        raise ValueError("provide exactly one of signal_id or rule")
+    drafter = (LLMDrafter() if body.drafter == "llm" else NarrowingDrafter()) if body.signal_id else None
+    amendment = request.app.state.agent.reflect.propose(
+        signal_id=body.signal_id, rule=body.rule, drafter=drafter, author=body.author)
+    return asdict(amendment)
+
+
+@app.post("/api/amendments/{amendment_id}/review")
+def review_amendment(request: Request, amendment_id: str, body: AmendmentReview) -> dict[str, Any]:
+    amendment = request.app.state.agent.reflect.approve(
+        amendment_id, body.approver, body.role, approved=body.approved, reason=body.reason)
+    return asdict(amendment)
 
 
 @app.post("/api/resume", response_model=AgentDecision)

@@ -11,13 +11,16 @@ from . import i18n
 from .domain import AgentDecision, ApprovalRequest, LLMProposal, Outcome, PendingTask, PendingTaskKind, PolicyCitation, ToolCall, TraceEvent, WorkflowStatus
 from .ontology import load_ontology
 from .planner import Planner, select_planner
+from .reflect import ReflectStore
 from .tools import DomainTools
 from .workflow.graph import build_workflow_graph
 from .workflow.state import initial_state
 
 class KYCExceptionAgent:
-    def __init__(self, tools: DomainTools | None = None, checkpointer: Any | None = None) -> None:
+    def __init__(self, tools: DomainTools | None = None, checkpointer: Any | None = None,
+                 reflect: ReflectStore | None = None) -> None:
         self.tools = tools or DomainTools()
+        self.reflect = reflect or ReflectStore()
         self.checkpointer = checkpointer
         self._graphs: dict[str, Any] = {}
         self._pending_tasks: dict[str, dict[str, Any]] = {}
@@ -72,6 +75,7 @@ class KYCExceptionAgent:
                     raise ValueError("operational review requires acknowledgement")
             result = pending["graph"].invoke(Command(resume=response), pending["config"])
             self._pending_tasks.pop(interrupt_key, None)
+            self._capture_signal(pending["case_id"], result)
             self._cache_result(pending["decision_id"], pending["case_id"], result, pending["config"], pending["graph"])
             return self._to_decision(pending["case_id"], result, pending["config"], pending["graph"], lang or result.get("lang", "en"), pending["decision_id"])
 
@@ -167,6 +171,22 @@ class KYCExceptionAgent:
             governance=governance,
             proposal_outcome=proposal.outcome if proposal else None,
             proposal_action=proposal.action if proposal else None,
+        )
+
+    def _capture_signal(self, case_id: str, result: dict[str, Any]) -> None:
+        """Turn a reviewer rejection or operational handoff into a Reflect signal."""
+        final = next((e for e in reversed(result.get("trace") or []) if e.get("step") == "finalize"), None)
+        kind = ((final or {}).get("metadata") or {}).get("review_signal")
+        if not kind:
+            return
+        decision = result.get("decision") or {}
+        review = result.get("review_result") or {}
+        self.reflect.record_signal(
+            kind=kind, case_id=case_id, run_id=result.get("run_id", ""),
+            rule_id=decision.get("rule_id"), rule_version=decision.get("rule_version"),
+            outcome=decision.get("outcome"), action_payload=decision.get("action_payload"),
+            reviewer_reason=review.get("reason") or result.get("operational_reason") or "",
+            facts=result.get("facts") or {},
         )
 
     @staticmethod

@@ -476,10 +476,14 @@ class WorkflowNodes:
         which covers CLEAR, a completed action, and every operational-review
         handoff."""
         status = state.get("final_outcome") or "COMPLETED"
+        review = state.get("review_result") or {}
+        signal = "rejection" if review.get("approved") is False else "operational_handoff" if review.get("acknowledged") else None
+        detail = f"Workflow ended with {status}" + ("; reviewer signal captured for Reflect" if signal else "")
         return {
             "workflow_status": status,
             "current_node": "finalize",
-            "trace": [self._event(state, "finalize", "Finalize decision", f"Workflow ended with {status}", runtime=runtime)],
+            "trace": [self._event(state, "finalize", "Finalize decision", detail, runtime=runtime,
+                                  metadata={"review_signal": signal} if signal else None)],
         }
 
     def action_error_handler(self, state: WorkflowState, error: NodeError) -> dict[str, Any]:

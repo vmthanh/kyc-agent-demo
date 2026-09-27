@@ -190,18 +190,18 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 **Files:** Create `app/reflect.py`, `data/amendments/` (gitignored runtime dir); modify `app/workflow/nodes.py` (finalize),
 `app/api.py`, `static/index.html`; create `tests/test_reflect.py`
 
-- [ ] On reviewer **rejection** (existing `review_result.reason`) or operational handoff, `finalize` emits a `REFLECT` trace event
+- [x] On reviewer **rejection** (existing `review_result.reason`) or operational handoff, `finalize` emits a `REFLECT` trace event
       and records a `ReviewSignal {case_id, rule_id, rule_version, reviewer_reason, facts_snapshot}` (append-only, in `DomainTools`-style store).
-- [ ] `propose_amendment(signal, planner)`: LLM drafts a **candidate rule** in the Task 1 schema (status `candidate`);
+- [x] `propose_amendment(signal, planner)`: LLM drafts a **candidate rule** in the Task 1 schema (status `candidate`);
       the loader validates it (closed ops, no `case_note`) — invalid drafts are rejected, not repaired silently.
       Eval double provides a deterministic draft for tests.
-- [ ] `replay(candidate, golden_set) -> ImpactReport {changed: [...], safety_regressions: int, agreement_before, agreement_after}`.
+- [x] `replay(candidate, golden_set) -> ImpactReport {changed: [...], safety_regressions: int, agreement_before, agreement_after}`.
       Promotion is **blocked** if `safety_regressions > 0` or any hard-stop rule would be shadowed.
-- [ ] `POST /api/amendments/{id}/promote` requires `{approver, approved: true}`; bumps ontology minor version, writes an audit record;
+- [x] `POST /api/amendments/{id}/promote` requires `{approver, approved: true}`; bumps ontology minor version, writes an audit record;
       rule never self-activates.
-- [ ] UI "Reflect" tab: signal → candidate rule diff → impact report → Promote button (disabled on regressions).
-- [ ] Tests: a candidate that lowers sanctions to "manual review" is blocked; a benign candidate is promotable and changes only its target cases.
-- [ ] Commit: `feat: evidence-gated reflect loop from reviewer signals to ontology amendments`.
+- [x] UI "Reflect" tab: signal → candidate rule diff → impact report → Promote button (disabled on regressions).
+- [x] Tests: a candidate that lowers sanctions to "manual review" is blocked; a benign candidate is promotable and changes only its target cases.
+- [x] Commit: `feat: evidence-gated reflect loop from reviewer signals to ontology amendments`.
 
 ### Task 8: Authority matrix and quorum
 
