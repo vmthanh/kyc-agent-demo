@@ -10,14 +10,24 @@ DECK = ROOT / "slides" / "index.html"
 class MainDeckTests(unittest.TestCase):
     def test_main_deck_is_current_and_candid(self) -> None:
         html = DECK.read_text()
-        self.assertEqual(len(re.findall(r'<section class="slide">', html)), 12)
+        self.assertEqual(len(re.findall(r'<section class="slide">', html)), 14)
         for claim in ("R-ID-EXP-01@1.0", "KYC-1043", "KYC-1044", "KYC-1046", "Re-test 65 cases",
                       "9 cases would become less safe", "60 practice cases", "71.7%", "80%",
                       "24 safety checks", "not DanaOS", "Not done yet", "not a production accuracy figure"):
             self.assertIn(claim.lower(), html.lower())
-        for jargon in ("reconcile_guard", "idempotency", "fan-in", "quorum", "counterfactual"):
-            visible = re.sub(r'<aside class="notes".*?</aside>', "", html, flags=re.S)
-            self.assertNotIn(jargon, visible.lower(), jargon)
+        for code_fact in ("reconcile_guard", "interrupt()", "POST /api/run",
+                          "sha256", "Proposal JSON schema", "R-AML-01", "evals.scorecard", "LangGraph", "FastAPI"):
+            self.assertIn(code_fact, html)
+
+    def test_workflow_slide_matches_the_real_graph(self) -> None:
+        html = DECK.read_text()
+        source = (ROOT / "app" / "workflow" / "graph.py").read_text()
+        nodes = set(re.findall(r'add_node\("([a-z_]+)"', source))
+        nodes |= set(re.findall(r'"(load_customer|verify_documents|screen_watchlists|load_risk)"', source))
+        self.assertEqual(len(nodes), 17)
+        self.assertIn("17 steps", html)
+        for node in nodes:
+            self.assertIn(f">{node}<", html, node)
 
     def test_any_images_resolve_from_the_html_deck(self) -> None:
         html = DECK.read_text()

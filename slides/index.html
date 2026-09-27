@@ -53,7 +53,7 @@ body{background:#0c1512;font-family:var(--font);color:var(--ink);overflow:hidden
 
 /* big flow */
 .flow{display:flex;align-items:stretch;margin-top:48px}
-.step{flex:1;background:var(--panel);padding:26px 20px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.step{flex:1 1 0;min-width:0;background:var(--panel);padding:26px 20px;text-align:center;display:flex;flex-direction:column;align-items:center}
 .step.lime{background:var(--lime)} .step.dark{background:var(--ink);color:#fff}
 .step.dark p{color:#C9D6CE}
 .step h3{font-size:24px;margin-top:18px}
@@ -66,18 +66,18 @@ body{background:#0c1512;font-family:var(--font);color:var(--ink);overflow:hidden
 table.vs{width:100%;border-collapse:collapse;margin-top:36px;table-layout:fixed}
 table.vs th{font-size:18px;text-align:left;padding:14px 20px;background:var(--panel)}
 table.vs th.us{background:var(--ink);color:#fff}
-table.vs td{font-size:19px;padding:16px 20px;border-bottom:1px solid var(--hair);line-height:1.3}
+table.vs td{font-size:19px;padding:12px 20px;border-bottom:1px solid var(--hair);line-height:1.3}
 table.vs td:first-child{font-weight:700}
 table.vs td.bad{color:var(--alert)} table.vs td.ok{color:var(--green);font-weight:700;background:#F5FAF6}
 
 /* rule ladder */
 .ladder{margin-top:30px;display:flex;flex-direction:column;gap:10px}
-.rung{display:grid;grid-template-columns:54px 1fr 70px 300px;align-items:center;background:var(--panel);min-height:66px}
+.rung{display:grid;grid-template-columns:40px 1fr 30px 220px;align-items:center;background:var(--panel);min-height:62px}
 .rung .n{font-size:22px;font-weight:700;color:var(--green);text-align:center}
-.rung .if{font-size:20px;padding:0 10px}
+.rung .if{font-size:17px;padding:0 8px}
 .rung .if span{display:block;font-size:14px;color:var(--gray);margin-top:3px}
 .rung .to{font-size:24px;color:var(--gray);text-align:center}
-.rung .then{height:100%;display:flex;align-items:center;padding:0 20px;font-size:19px;font-weight:700}
+.rung .then{height:100%;display:flex;align-items:center;padding:0 14px;font-size:16px;font-weight:700}
 .rung.stop{background:var(--alert-bg)} .rung.stop .then{background:var(--alert);color:#fff}
 .rung.exp{background:var(--amber-bg)} .rung.exp .then{background:#F2C14E}
 .then.p{background:#D9E6DC} .then.ok{background:var(--lime)}
@@ -104,14 +104,14 @@ mark.red{background:#FFC7BD}
 
 /* approvals */
 .approvals{display:flex;align-items:center;margin-top:44px}
-.ap{flex:1;padding:24px;background:var(--panel);text-align:center}
-.ap .count{font-size:52px;font-weight:700}
+.ap{flex:1;padding:16px 20px;background:var(--panel);text-align:center}
+.ap .count{font-size:42px;font-weight:700}
 .ap p{font-size:18px;color:var(--gray);margin-top:8px;line-height:1.35}
 .ap.done{background:var(--lime)} .ap.done p{color:var(--ink)}
 .ap.wait .count{color:var(--gray)}
 
 /* bars */
-.metric{display:grid;grid-template-columns:260px 1fr;gap:24px;align-items:center;margin-top:26px}
+.metric{display:grid;grid-template-columns:260px 1fr;gap:24px;align-items:center;margin-top:18px}
 .metric .lab{font-size:21px;font-weight:700;line-height:1.25}
 .metric .lab span{display:block;font-size:14px;font-weight:400;color:var(--gray);margin-top:4px}
 .bars{display:flex;flex-direction:column;gap:8px}
@@ -139,7 +139,7 @@ mark.red{background:#FFC7BD}
 .col.done{background:var(--panel)} .col.todo{background:#F6F6F2;border:2px dashed #C9CFC6}
 .col h3{font-size:24px}
 .col ul{list-style:none;margin-top:14px}
-.col li{font-size:19px;padding:10px 0 10px 34px;position:relative;line-height:1.3}
+.col li{font-size:18px;padding:8px 0 8px 34px;position:relative;line-height:1.3}
 .col li + li{border-top:1px solid #DCE6DE}
 .col li::before{position:absolute;left:0;top:9px;font-weight:700;font-size:20px}
 .col.done li::before{content:"✓";color:var(--green)}
@@ -153,6 +153,47 @@ mark.red{background:#FFC7BD}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px;background:var(--panel);padding:24px 28px}
 .stats .h{font-size:13px;font-weight:700;letter-spacing:.1em;color:var(--green);text-transform:uppercase}
 .stats .b{font-size:21px;font-weight:700;margin-top:8px}
+
+
+/* architecture: layers */
+.layers{display:flex;align-items:stretch;margin-top:30px}
+.layer{flex:1;background:var(--panel);padding:18px 18px 16px;display:flex;flex-direction:column}
+.layer.hl{background:var(--lime)}
+.layer .tag{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--green);text-transform:uppercase}
+.layer h3{font-size:22px;margin-top:8px}
+.layer .tech{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:13px;color:var(--ink);margin-top:6px;opacity:.8}
+.layer p{font-size:15px;color:var(--gray);line-height:1.38;margin-top:8px}
+.layer.hl p{color:var(--ink)}
+.helpers{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:10px}
+.helper{border:1px solid var(--hair);padding:10px 12px;font-size:14px;line-height:1.3}
+.helper b{display:block;font-size:15px}
+.helper span{color:var(--gray)}
+.helpers-lbl{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--gray);text-transform:uppercase;margin-top:14px;text-align:right;padding-right:4px}
+.click{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:22px}
+.click div{background:#F7F9F7;border-top:3px solid var(--green);padding:10px 12px;font-size:14px;line-height:1.32}
+.click div b{display:block;font-size:13px;color:var(--green)}
+.click div code{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12px}
+.click div.pause{border-top-color:var(--alert)} .click div.pause b{color:var(--alert)}
+/* architecture: graph */
+svg.graph{display:block;margin-top:18px}
+svg.graph .nm{font:700 12px "SF Mono",ui-monospace,Menlo,monospace;fill:var(--ink)}
+svg.graph .cp{font:12px Arial,sans-serif;fill:var(--gray)}
+svg.graph .el{font:700 11px Arial,sans-serif;fill:var(--green)}
+svg.graph path,svg.graph line{stroke:#7F978A;stroke-width:1.6;fill:none}
+.glegend{display:flex;gap:22px;margin-top:10px;font-size:14px;font-weight:700;flex-wrap:wrap}
+.glegend i{display:inline-block;width:16px;height:16px;margin-right:7px;vertical-align:-3px;border:1px solid #9FB3A7}
+
+/* under-the-hood */
+.hood{background:var(--ink);color:#D3DED7;padding:14px 20px;font-size:14px;line-height:1.5}
+.hood .t{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--lime);text-transform:uppercase;margin-bottom:4px}
+.hood code,.code,.m{font-family:"SF Mono",ui-monospace,Menlo,monospace}
+.hood code{color:#fff;font-size:13px}
+.hood b{color:#fff}
+pre.code{background:#0F1F18;color:#D3DED7;font-size:13px;line-height:1.5;padding:16px 18px;white-space:pre;overflow:hidden}
+pre.code .k{color:#9FE0B8} pre.code .v{color:#C8FF62} pre.code .c{color:#7E9188}
+.step .m{font-size:11.5px;overflow-wrap:anywhere;margin-top:10px;padding:4px 6px;background:rgba(255,255,255,.65);color:var(--ink);line-height:1.35}
+.step.dark .m{background:#1E352B;color:var(--lime)}
+td .m{display:block;font-size:12.5px;font-weight:400;color:var(--gray);margin-top:3px}
 
 /* notes / controls */
 .notes{display:none}
@@ -227,15 +268,15 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <div class="kicker">The idea in one picture</div>
   <h1>Each part does only what it is good at</h1>
   <div class="flow">
-    <div class="step"><div class="ico">🔎</div><h3>Gather facts</h3><p>ID check, face check, sanctions list, risk score</p><div class="who">Software</div></div>
+    <div class="step"><div class="ico">🔎</div><h3>Gather facts</h3><p>ID check, face check, sanctions list, risk score</p><div class="m">4 LangGraph nodes, in parallel</div><div class="who">Software</div></div>
     <div class="arrow">→</div>
-    <div class="step"><div class="ico">💡</div><h3>AI suggests</h3><p>Proposes an outcome and explains why</p><div class="who">AI model</div></div>
+    <div class="step"><div class="ico">💡</div><h3>AI suggests</h3><p>Proposes an outcome and explains why</p><div class="m">OpenRouter · Proposal JSON schema</div><div class="who">AI model</div></div>
     <div class="arrow">→</div>
-    <div class="step lime"><div class="ico" style="background:#fff">📏</div><h3>Rules decide</h3><p>Written rules check the facts and set the outcome</p><div class="who">Rulebook</div></div>
+    <div class="step lime"><div class="ico" style="background:#fff">📏</div><h3>Rules decide</h3><p>Written rules check the facts and set the outcome</p><div class="m">reconcile_guard + ontology.json</div><div class="who">Rulebook</div></div>
     <div class="arrow">→</div>
-    <div class="step"><div class="ico">👤</div><h3>Person approves</h3><p>Any action waits for a named reviewer</p><div class="who">Human</div></div>
+    <div class="step"><div class="ico">👤</div><h3>Person approves</h3><p>Any action waits for a named reviewer</p><div class="m">interrupt() + authority matrix</div><div class="who">Human</div></div>
     <div class="arrow">→</div>
-    <div class="step dark"><div class="ico lime">✅</div><h3>Act once</h3><p>Opens one ticket, never a duplicate</p><div class="who">System</div></div>
+    <div class="step dark"><div class="ico lime">✅</div><h3>Act once</h3><p>Opens one ticket, never a duplicate</p><div class="m">sha256 idempotency key</div><div class="who">System</div></div>
   </div>
   <div class="foot">If the AI and the rules disagree, <b>the rules win</b> — and the disagreement is recorded</div>
   <div class="pagenum"></div>
@@ -243,6 +284,76 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     Technical mapping, if asked: four data lookups run in parallel (LangGraph), the model is called through
     OpenRouter, reconcile_guard applies the executable rules, an interrupt waits for approval, and the action
     gateway uses an idempotency key so a retry never creates a second ticket. The model cannot call tools or write.
+  </aside>
+</section>
+
+
+<!-- 04 PIECES -->
+<section class="slide">
+  <div class="kicker">How it works · the pieces</div>
+  <h1>Front end, back end, agent and workflow</h1>
+  <div class="layers">
+    <div class="layer"><div class="tag">Front end</div><h3>Web page</h3><div class="tech">static/index.html · Streamlit (optional)</div>
+      <p>Pick a case, see the decision, click Approve or Reject. Holds no business logic.</p></div>
+    <div class="arrow">→</div>
+    <div class="layer"><div class="tag">Back end</div><h3>Web API</h3><div class="tech">FastAPI · app/api.py</div>
+      <p>Turns clicks into requests: /api/run, /api/approve, /api/reject, /api/compare.</p></div>
+    <div class="arrow">→</div>
+    <div class="layer"><div class="tag">Agent</div><h3>Case manager</h3><div class="tech">KYCExceptionAgent · app/agent.py</div>
+      <p>Starts a case, pauses it, resumes it after approval, returns one clear answer.</p></div>
+    <div class="arrow">→</div>
+    <div class="layer hl"><div class="tag">Workflow</div><h3>Step-by-step map</h3><div class="tech">LangGraph · app/workflow/</div>
+      <p>17 steps and the paths between them. All the decision logic lives here (next slide).</p></div>
+  </div>
+  <div class="helpers-lbl">The workflow uses ↓</div>
+  <div class="helpers">
+    <div class="helper"><b>Case data &amp; checks</b><span>app/tools.py · read-only</span></div>
+    <div class="helper"><b>Rulebook</b><span>data/ontology.json</span></div>
+    <div class="helper"><b>AI model</b><span>OpenRouter or local server</span></div>
+    <div class="helper"><b>Saved progress</b><span>memory, or Redis</span></div>
+    <div class="helper"><b>Step-by-step log</b><span>MLflow traces (optional)</span></div>
+  </div>
+  <div class="click">
+    <div><b>1 · You click Run</b>on the web page</div>
+    <div><b>2 · Request</b><code>POST /api/run</code></div>
+    <div><b>3 · Agent starts</b>the workflow for this case</div>
+    <div class="pause"><b>4 · Workflow pauses</b>progress saved, waits for a person</div>
+    <div><b>5 · You click Approve</b><code>POST /api/approve</code></div>
+    <div><b>6 · Workflow resumes</b>from the saved step, acts once</div>
+  </div>
+  <div class="foot">The web page never decides anything <b>·</b> every decision happens inside the workflow</div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="static/index.html · app/ui.py · app/client.py · app/api.py · app/agent.py · app/checkpointing.py · app/workflow/graph.py">
+    Both UIs are thin clients of the same REST contract; Streamlit runs as its own process and calls the API through
+    KYCClient. FastAPI's lifespan creates one agent and one checkpointer per process. The agent is a thin facade
+    (run / approve / reject / resume / relocalize) that turns graph state into a typed AgentDecision. The pause is a
+    LangGraph interrupt; the checkpointer (in-memory or Redis Stack) stores graph state. Limit: pending-approval
+    handles live in process memory, so this runs as a single server today.
+  </aside>
+</section>
+
+<!-- 05 GRAPH -->
+<section class="slide">
+  <div class="kicker">How it works · inside the workflow (LangGraph)</div>
+  <h1>Every step is a box; every arrow is a possible path</h1>
+  <svg class="graph" width="1168" height="445" viewBox="0 0 1180 450"><defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:#7F978A;stroke:none"/></marker></defs><path d="M140 132 C158 132 156 45 172 45" marker-end="url(#ah)"/><path d="M140 132 C158 132 156 103 172 103" marker-end="url(#ah)"/><path d="M140 132 C158 132 156 161 172 161" marker-end="url(#ah)"/><path d="M140 132 C158 132 156 219 172 219" marker-end="url(#ah)"/><path d="M312 45 C330 45 328 132 344 132" marker-end="url(#ah)"/><path d="M312 103 C330 103 328 132 344 132" marker-end="url(#ah)"/><path d="M312 161 C330 161 328 132 344 132" marker-end="url(#ah)"/><path d="M312 219 C330 219 328 132 344 132" marker-end="url(#ah)"/><line x1="484" y1="132" x2="514" y2="132" marker-end="url(#ah)"/><line x1="656" y1="132" x2="686" y2="132" marker-end="url(#ah)"/><line x1="828" y1="132" x2="858" y2="132" marker-end="url(#ah)"/><line x1="1000" y1="132" x2="1028" y2="132" marker-end="url(#ah)"/><line x1="1100" y1="157" x2="1100" y2="288" marker-end="url(#ah)"/><text class="el" x="1106" y="228">act</text><path d="M1170 132 H1178 V410 H1172" marker-end="url(#ah)"/><text class="el" x="1172" y="99" text-anchor="end">clear or compliance stop</text><line x1="1030" y1="315" x2="1002" y2="315" marker-end="url(#ah)"/><text class="el" x="1016" y="308" text-anchor="middle">yes</text><line x1="1100" y1="340" x2="1100" y2="383" marker-end="url(#ah)"/><text class="el" x="1106" y="362">no</text><line x1="860" y1="315" x2="830" y2="315" marker-end="url(#ah)"/><text class="el" x="845" y="282" text-anchor="middle">need docs</text><path d="M930 340 V400 H1028" marker-end="url(#ah)"/><text class="el" x="936" y="362">done</text><line x1="688" y1="315" x2="658" y2="315" marker-end="url(#ah)"/><line x1="516" y1="315" x2="486" y2="315" marker-end="url(#ah)"/><text class="el" x="501" y="308" text-anchor="middle">ok</text><path d="M344 315 H242 V246" marker-end="url(#ah)" style="stroke:var(--green);stroke-width:2;stroke-dasharray:5 4"/><text class="el" x="294" y="308" text-anchor="middle">check again</text><line x1="828" y1="421" x2="1028" y2="421" marker-end="url(#ah)"/><path d="M414 157 V225 H672 V410 H686" marker-end="url(#ah)" style="stroke:#B83B32;stroke-dasharray:4 4"/><text class="el" x="422" y="218" style="fill:#B83B32">missing facts · AI or tool failure</text><rect x="0" y="107" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="70.0" y="128" text-anchor="middle">intake</text><text class="cp" x="70.0" y="145" text-anchor="middle">start the case</text><rect x="172" y="20" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="242.0" y="41" text-anchor="middle">load_customer</text><text class="cp" x="242.0" y="58" text-anchor="middle">customer record</text><rect x="172" y="78" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="242.0" y="99" text-anchor="middle">verify_documents</text><text class="cp" x="242.0" y="116" text-anchor="middle">ID + face check</text><rect x="172" y="136" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="242.0" y="157" text-anchor="middle">screen_watchlists</text><text class="cp" x="242.0" y="174" text-anchor="middle">sanctions list</text><rect x="172" y="194" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="242.0" y="215" text-anchor="middle">load_risk</text><text class="cp" x="242.0" y="232" text-anchor="middle">risk score</text><rect x="344" y="107" width="140" height="50" rx="4" fill="#C8FF62" stroke="#9BC94A" stroke-width="1"/><text class="nm" x="414.0" y="128" text-anchor="middle">evidence_gate</text><text class="cp" x="414.0" y="145" text-anchor="middle">enough facts?</text><rect x="516" y="107" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="586.0" y="128" text-anchor="middle">retrieve_policy</text><text class="cp" x="586.0" y="145" text-anchor="middle">find policy text</text><rect x="688" y="107" width="140" height="50" rx="4" fill="#C8FF62" stroke="#9BC94A" stroke-width="1"/><text class="nm" x="758.0" y="128" text-anchor="middle">policy_precheck</text><text class="cp" x="758.0" y="145" text-anchor="middle">which rule applies</text><rect x="860" y="107" width="140" height="50" rx="4" fill="#FFF5DB" stroke="#D8B64A" stroke-width="1"/><text class="nm" x="930.0" y="128" text-anchor="middle">openrouter_reason</text><text class="cp" x="930.0" y="145" text-anchor="middle">AI suggests</text><rect x="1030" y="107" width="140" height="50" rx="4" fill="#C8FF62" stroke="#9BC94A" stroke-width="1"/><text class="nm" x="1100.0" y="128" text-anchor="middle">reconcile_guard</text><text class="cp" x="1100.0" y="145" text-anchor="middle">rules decide</text><rect x="1030" y="290" width="140" height="50" rx="4" fill="#FFF0EC" stroke="#B83B32" stroke-width="2"/><text class="nm" x="1100.0" y="311" text-anchor="middle">action_review</text><text class="cp" x="1100.0" y="328" text-anchor="middle">⏸ person approves</text><rect x="860" y="290" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="930.0" y="311" text-anchor="middle">execute_action</text><text class="cp" x="930.0" y="328" text-anchor="middle">open one ticket</text><rect x="688" y="290" width="140" height="50" rx="4" fill="#FFF0EC" stroke="#B83B32" stroke-width="2"/><text class="nm" x="758.0" y="311" text-anchor="middle">await_documents</text><text class="cp" x="758.0" y="328" text-anchor="middle">⏸ wait for upload</text><rect x="516" y="290" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="586.0" y="311" text-anchor="middle">validate_submission</text><text class="cp" x="586.0" y="328" text-anchor="middle">check the upload</text><rect x="344" y="290" width="140" height="50" rx="4" fill="#EAF1EC" stroke="#C9D6CE" stroke-width="1"/><text class="nm" x="414.0" y="311" text-anchor="middle">increment_cycle</text><text class="cp" x="414.0" y="328" text-anchor="middle">start round 2</text><rect x="688" y="385" width="140" height="50" rx="4" fill="#FFF0EC" stroke="#B83B32" stroke-width="2"/><text class="nm" x="758.0" y="406" text-anchor="middle">operational_review</text><text class="cp" x="758.0" y="423" text-anchor="middle">⏸ person reviews</text><rect x="1030" y="385" width="140" height="50" rx="4" fill="#10251C" stroke="#10251C" stroke-width="1"/><text class="nm" x="1100.0" y="406" text-anchor="middle" style="fill:#fff">finalize</text><text class="cp" x="1100.0" y="423" text-anchor="middle" style="fill:#C8FF62">final answer → END</text></svg>
+  <div class="glegend">
+    <span><i style="background:#EAF1EC"></i>Collect facts / do work</span>
+    <span><i style="background:#C8FF62"></i>Rule check</span>
+    <span><i style="background:#FFF5DB"></i>AI suggestion</span>
+    <span><i style="background:#FFF0EC;border:2px solid #B83B32"></i>⏸ Pauses for a person</span>
+    <span><i style="background:#10251C"></i>Final answer</span>
+  </div>
+  <div class="small" style="margin-top:10px">Progress is saved after every step, so a paused case resumes exactly where it stopped. Real node names from app/workflow/graph.py; a few retry arrows are left out.</div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="app/workflow/graph.py · app/workflow/routing.py · app/workflow/nodes.py">
+    Drawn from build_workflow_graph. intake fans out to four grounding reads that run in parallel and fan back in at
+    evidence_gate. retrieve_policy and policy_precheck pick the rule; openrouter_reason calls the model (it fails
+    closed and never raises); reconcile_guard applies the executable rules and routes: clear/blocked → finalize,
+    needs_action → action_review, escalate → operational_review. action_review, await_documents and
+    operational_review use LangGraph interrupt(). The grounding and action nodes retry transient tool errors, then
+    fail closed. validate_submission can also loop back to await_documents (retry) or give up to
+    operational_review. Print the live graph with KYC_PRINT_GRAPH=1.
   </aside>
 </section>
 
@@ -254,11 +365,11 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <colgroup><col style="width:34%"><col style="width:33%"><col style="width:33%"></colgroup>
     <thead><tr><th></th><th>AI chatbot + documents</th><th class="us">This agent</th></tr></thead>
     <tbody>
-      <tr><td>Who makes the final call?</td><td class="bad">The AI</td><td class="ok">A written rule</td></tr>
-      <tr><td>A note says “just approve it”</td><td class="bad">May obey it</td><td class="ok">Rules never read notes</td></tr>
-      <tr><td>Can it act on its own?</td><td class="bad">Yes</td><td class="ok">Only after a person approves</td></tr>
-      <tr><td>Same case, same answer?</td><td class="bad">Not always</td><td class="ok">Always</td></tr>
-      <tr><td>Can you explain why?</td><td class="bad">“The AI thought so”</td><td class="ok">Rule name, version and source</td></tr>
+      <tr><td>Who makes the final call?</td><td class="bad">The AI</td><td class="ok">A written rule<span class="m">reconcile_guard overrides the proposal</span></td></tr>
+      <tr><td>A note says “just approve it”</td><td class="bad">May obey it</td><td class="ok">Rules never read notes<span class="m">case_note → prompt only; loader rejects it as a fact</span></td></tr>
+      <tr><td>Can it act on its own?</td><td class="bad">Yes</td><td class="ok">Only after a person approves<span class="m">model has no tools; writes go through interrupt()</span></td></tr>
+      <tr><td>Same case, same answer?</td><td class="bad">Not always</td><td class="ok">Always<span class="m">pure function of typed facts + rule version</span></td></tr>
+      <tr><td>Can you explain why?</td><td class="bad">“The AI thought so”</td><td class="ok">Rule name, version and source<span class="m">R-AML-01@1.0 → AML-SCREEN-02 §2.3</span></td></tr>
     </tbody>
   </table>
   <div class="pagenum"></div>
@@ -271,15 +382,26 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <!-- 05 RULEBOOK -->
 <section class="slide">
   <div class="kicker">The rulebook</div>
-  <h1>Five plain rules, checked from top to bottom</h1>
-  <div class="ladder">
+  <h1>Five rules, checked in priority order; first match wins</h1>
+  <div style="display:grid;grid-template-columns:1fr 430px;gap:22px"><div class="ladder" style="margin-top:26px">
     <div class="rung stop"><div class="n">1</div><div class="if">Sanctions similarity is 80% or higher<span>Always wins. Nothing can skip it.</span></div><div class="to">→</div><div class="then">Send to compliance team</div></div>
     <div class="rung exp"><div class="n">2</div><div class="if">Name differs only by blur or missing accents<span>An expert's tip, written down as a rule</span></div><div class="to">→</div><div class="then">Ask for a clearer photo</div></div>
     <div class="rung"><div class="n">3</div><div class="if">Any other name or face mismatch</div><div class="to">→</div><div class="then p">Human review</div></div>
     <div class="rung"><div class="n">4</div><div class="if">A required document is missing</div><div class="to">→</div><div class="then p">Ask for the document</div></div>
     <div class="rung"><div class="n">5</div><div class="if">Everything checks out</div><div class="to">→</div><div class="then ok">Approve</div></div>
   </div>
-  <div class="small" style="margin-top:18px">The first rule that matches wins. Each rule has a version and a source, e.g. R-ID-EXP-01@1.0 ← KYC-IDENTITY-12.</div>
+  <div style="margin-top:26px"><pre class="code"><span class="c">// data/ontology.json · rule 1</span>
+{ <span class="k">"id"</span>: <span class="v">"R-AML-01"</span>, <span class="k">"version"</span>: <span class="v">"1.0"</span>,
+  <span class="k">"priority"</span>: 10, <span class="k">"hard_stop"</span>: true,
+  <span class="k">"params"</span>: { <span class="k">"threshold"</span>: 0.8 },
+  <span class="k">"when"</span>: { <span class="k">"all"</span>: [{
+    <span class="k">"fact"</span>: <span class="v">"screen_sanctions.match_score"</span>,
+    <span class="k">"op"</span>: <span class="v">"&gt;="</span>, <span class="k">"value"</span>: <span class="v">"@threshold"</span> }] },
+  <span class="k">"then"</span>: { <span class="k">"outcome"</span>: <span class="v">"ESCALATE_COMPLIANCE"</span>,
+            <span class="k">"action"</span>: null },
+  <span class="k">"source"</span>: { <span class="k">"kind"</span>: <span class="v">"policy"</span>,
+              <span class="k">"ref"</span>: <span class="v">"AML-SCREEN-02 §2.3"</span> } }</pre>
+  <div class="small" style="margin-top:10px;font-size:14px">Loaded by <span class="m">app/ontology.py</span>: schema-validated, closed operator set (<span class="m">&gt;= &lt; is_true empty …</span>), no <span class="m">eval</span>, hard stops must come first, <span class="m">case_note</span> rejected as input.</div></div></div>
   <div class="foot">Rules live in a file anyone can read <b>·</b> not hidden inside the AI's prompt</div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="data/ontology.json · app/ontology.py · tests/test_ontology.py">
@@ -304,7 +426,10 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <div class="side good"><div class="who">This agent</div><div class="big">Sent to compliance 10 / 10</div>
       <p>Rule 1 matched. No approval button, nothing sent out.</p></div>
   </div>
-  <div class="foot">Same AI, different outcome <b>·</b> the difference is the written rule in front of it</div>
+  <div class="hood" style="margin-top:18px"><div class="t">Under the hood</div>
+    <code>POST /api/compare</code> runs both paths on the same case. Rules read the typed fact <code>screen_sanctions.match_score = 0.91</code>; the note only reaches the prompt.
+    Chatbot = same model + retrieved policy, no guard; its “approve” is simulated (<code>would_execute</code>), never sent.</div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">Same AI, different outcome <b>·</b> the difference is the written rule in front of it</div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="data/cases.json:KYC-1044 · app/baseline.py · static/index.html (Compare with generic RAG)">
     Live: http://localhost:8000 → KYC-1044 → normal → "Compare with generic RAG". The 3–4/10 is from earlier live
@@ -317,7 +442,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <section class="slide">
   <div class="kicker">Demo 2 · an expert's tip, turned into a rule</div>
   <h1>Blurry photo or different person?</h1>
-  <div class="duo" style="margin-top:34px">
+  <div class="duo" style="margin-top:22px">
     <div class="side good" style="background:var(--amber-bg)"><div class="who" style="color:var(--amber)">KYC-1043 · blurry ID photo</div>
       <div class="names">Tr<mark>ầ</mark>n M<mark>i</mark>nh Anh<span class="vs">form vs. ID photo</span>Tr<mark>a</mark>n M<mark>l</mark>nh Anh</div>
       <p>Only lost accents and “i” read as “l”. Face check passed.</p>
@@ -327,7 +452,10 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
       <p>Not explained by blur. Could be fraud.</p>
       <div class="verdict">→ Human review, approved by two people</div></div>
   </div>
-  <div class="foot">The expert's tip helps with blur <b>·</b> it can never approve a customer by itself</div>
+  <div class="hood" style="margin-top:16px"><div class="t">Under the hood · app/names.py → R-ID-EXP-01@1.0</div>
+    Strip accents, then map OCR look-alikes (<code>l→i</code>, <code>rn→m</code>, <code>0→o</code>) → fact <code>name_diff.ocr_explainable</code>.
+    Rule fires only if <code>ocr_explainable</code> ∧ <code>liveness_passed</code> ∧ <code>tamper_score &lt; 0.10</code> ∧ nothing missing. Otherwise R-ID-01 → manual review.</div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">The expert's tip helps with blur <b>·</b> it can never approve a customer by itself</div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="app/names.py · data/ontology.json (R-ID-EXP-01) · tests/test_expert_rule.py">
     The tip "Vietnamese accents are often lost by the scanner" is written as rule R-ID-EXP-01. It never approves an
@@ -340,18 +468,24 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <section class="slide">
   <div class="kicker">Demo 3 · case KYC-1046</div>
   <h1>Risky actions need two different people</h1>
-  <div class="approvals">
+  <div class="approvals" style="margin-top:26px">
     <div class="ap wait"><div class="count">0 / 2</div><p>Agent prepares the exact request and waits</p></div>
     <div class="arrow">→</div>
     <div class="ap"><div class="count">1 / 2</div><p>Analyst approves.<br>Still nothing happens.</p></div>
     <div class="arrow">→</div>
     <div class="ap done"><div class="count">2 / 2</div><p>KYC lead approves.<br>One review ticket opens.</p></div>
   </div>
-  <div class="duo" style="margin-top:30px">
-    <div class="side good" style="padding:20px 26px"><div class="who">Same person twice?</div><p style="color:var(--ink);font-size:20px">Not counted. It must be two different people.</p></div>
-    <div class="side good" style="padding:20px 26px"><div class="who">Button clicked twice?</div><p style="color:var(--ink);font-size:20px">Still only one ticket. No duplicates.</p></div>
+  <div class="duo" style="margin-top:22px">
+    <div><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:6px">Who must approve · ontology.json “authority”</div><pre class="code"><span class="k">"open_manual_review"</span>: {
+  <span class="k">"approvals"</span>: 1, <span class="k">"roles"</span>: [<span class="v">"analyst"</span>, <span class="v">"kyc_lead"</span>, …],
+  <span class="k">"by_risk"</span>: { <span class="k">"HIGH"</span>: { <span class="k">"approvals"</span>: <span class="v">2</span> } } }
+<span class="c">// same person twice → not counted</span></pre></div>
+    <div><div class="small" style="font-weight:700;color:var(--ink);margin-bottom:6px">What is approved · the exact payload</div><pre class="code">{ <span class="k">"case_id"</span>: <span class="v">"KYC-1046"</span>, <span class="k">"action"</span>: <span class="v">"open_manual_review"</span>,
+  <span class="k">"rule"</span>: <span class="v">"R-ID-01@1.0"</span>, <span class="k">"policy_versions"</span>: […] }
+<span class="c">key = sha256(canonical JSON)[:16]</span>
+<span class="c">// clicked twice → same key → one ticket</span></pre></div>
   </div>
-  <div class="foot">The bigger the risk, the more people must say yes</div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">The bigger the risk, the more people must say yes <b>·</b> each pause is a LangGraph <b>interrupt()</b></div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="app/authority.py · data/ontology.json (authority) · app/tools.py · tests/test_authority.py">
     Called "maker-checker". The number and roles of approvers depend on how risky the action is. A reviewer sees
@@ -371,8 +505,10 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <div class="bars"><div class="bar zero">0</div><div class="bar them" style="width:12%">2</div></div></div>
   <div class="metric"><div class="lab">Would act with no approval<span>simulated only</span></div>
     <div class="bars"><div class="bar zero">0</div><div class="bar them" style="width:80%">48</div></div></div>
-  <div class="small" style="margin-top:26px">One run on 2026-09-27 with gpt-4o-mini. Made-up practice cases, not real customers — this is not a production accuracy figure.</div>
-  <div class="foot">The AI alone was right 80% of the time <b>·</b> the rules fixed the rest</div>
+  <div class="hood" style="margin-top:20px"><div class="t">How it was measured</div>
+    <code>python -m evals.scorecard --planner normal --baseline</code> · 60 generated cases, 12 categories, 10 with injected notes · one run, 2026-09-27, gpt-4o-mini.
+    CI stays offline: <b>231 unit tests + 24 deterministic evals</b>, no API key. Made-up cases — not a production accuracy figure.</div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">The AI alone was right 80% of the time <b>·</b> the rules fixed the rest</div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="docs/results/2026-09-27-scorecard-gpt-4o-mini.md · evals/scorecard.py">
     The 60 cases cover 12 categories, including 10 with tricky notes and borderline sanctions and photo cases.
@@ -386,7 +522,7 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
 <section class="slide">
   <div class="kicker">Learning from reviewers</div>
   <h1>Rules can improve, but only after a safety check</h1>
-  <div class="loop">
+  <div class="loop" style="margin-top:26px">
     <div class="step"><div class="ico">🙋</div><h3>Reviewer disagrees</h3><p>“0.09 photo-edit score is too close to call”</p></div>
     <div class="arrow">→</div>
     <div class="step"><div class="ico">✏️</div><h3>Draft a change</h3><p>Tighten the limit from 0.10 to 0.09</p></div>
@@ -397,11 +533,14 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     <div class="arrow">→</div>
     <div class="step dark"><div class="ico lime">🚀</div><h3>New rule goes live</h3><p>As a new version, with a record</p></div>
   </div>
-  <div class="results">
+  <div class="results" style="margin-top:16px">
     <div class="res ok"><div class="ico lime">✓</div><div><h3>Tighter photo check: allowed</h3><p>1 case now safer, 0 got worse</p></div></div>
     <div class="res no"><div class="ico red">✕</div><div><h3>Raise sanctions limit to 95%: blocked</h3><p>9 cases would become less safe</p></div></div>
   </div>
-  <div class="foot">Feedback makes the rules better <b>·</b> the safety re-test stops it making them worse</div>
+  <div class="hood" style="margin-top:16px"><div class="t">Under the hood · app/reflect.py</div>
+    Reject → signal → <code>POST /api/amendments</code> → candidate validated by the ontology loader → replay 60 labelled + 5 demo cases → any safety regression blocks →
+    <code>promote_amendment</code> needs kyc_lead + compliance (distinct roles) → new version in <code>.runtime/ontology/</code> + append-only audit log.</div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">Feedback makes the rules better <b>·</b> the safety re-test stops it making them worse</div>
   <div class="pagenum"></div>
   <aside class="notes" data-src="app/reflect.py · tests/test_reflect.py · docs/DEMO_RUNBOOK.md">
     This is the "Reflect" step: reviewer feedback → candidate rule → replay on 60 labelled + 5 demo cases → two
@@ -416,18 +555,18 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
   <h1>What works today, and what comes next</h1>
   <div class="cols">
     <div class="col done"><h3>Built and tested</h3><ul>
-      <li>Working app you can click through</li>
+      <li>Working app you can click through<span>FastAPI + LangGraph + static UI; Streamlit + MLflow optional</span></li>
       <li>5 written rules, including one expert tip</li>
-      <li>Two-person approval, no duplicate actions</li>
+      <li>Two-person approval, no duplicate actions<span>authority matrix + sha256 idempotency key</span></li>
       <li>Rule changes re-tested before going live</li>
       <li>60 practice cases, 230+ automated tests<span>plus 24 safety checks</span></li>
     </ul></div>
     <div class="col todo"><h3>Not done yet</h3><ul>
-      <li>A small AI model running on our own machine<span>Two small hosted models gave 0 usable answers in a quick test</span></li>
+      <li>A small AI model running on our own machine<span>LocalPlanner (OpenAI-compatible) is mock-tested, not benchmarked; hosted Qwen 7B/8B: 0/10 valid JSON</span></li>
       <li>Real bank data and real policy sign-off</li>
-      <li>Turning policy documents into rules automatically</li>
+      <li>Turning policy documents into rules automatically<span>rules are hand-written today</span></li>
       <li>A second industry beyond KYC</li>
-      <li>Running on many servers at once</li>
+      <li>Running on many servers at once<span>pending approvals + idempotency store are in memory → one replica</span></li>
     </ul></div>
   </div>
   <div class="small" style="margin-top:18px">Inspired by Aitomatic's public DanaOS ideas. This is my own small demo — not DanaOS, and not a certified compliance system.</div>
