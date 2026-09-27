@@ -62,6 +62,13 @@ class KYCClient:
             "/api/run", {"case_id": case_id, "planner_mode": planner_mode, "lang": lang}
         )
 
+    def compare(self, case_id: str, planner_mode: str = "normal", lang: str = "en", samples: int = 1) -> dict[str, Any]:
+        """Side-by-side generic baseline vs governed run; `governed` is rehydrated."""
+        body = self._request("POST", "/api/compare", {"case_id": case_id, "planner_mode": planner_mode,
+                                                        "lang": lang, "samples": samples})
+        body["governed"] = _DECISION.validate_python(body["governed"])
+        return body
+
     def resume(self, interrupt_key: str, response: dict[str, Any], lang: str | None = None) -> AgentDecision:
         return self._decision(
             "/api/resume", {"interrupt_key": interrupt_key, "response": response, "lang": lang}

@@ -60,5 +60,28 @@ class OpenRouterWorkflowPlannerTests(unittest.TestCase):
         })
 
 
+    def test_string_null_action_is_normalized_so_the_guard_does_not_report_a_false_override(self) -> None:
+        from app.domain import Outcome
+        from app.policy import PolicyVerdict, guard_verdict
+
+        class Client:
+            def __init__(self, action):
+                self.action = action
+
+            def invoke(self, messages):
+                return {"parsed": type("P", (), {"outcome": "ESCALATE_COMPLIANCE", "action": self.action,
+                                                   "rationale": "r", "confidence": 0.9})(),
+                        "raw": None, "parsing_error": None}
+
+        verdict = PolicyVerdict(Outcome.ESCALATE_COMPLIANCE, None, "CRITICAL", "sanctions_hit")
+        for spelled in (None, "null", "None", " ", "no_action"):
+            planner = object.__new__(OpenRouterPlanner)
+            planner.name, planner.model, planner.compromised = "openrouter:test", "test", False
+            planner._structured_client = Client(spelled)
+            proposal = planner.propose("KYC-1044", {}, [], "note")
+            self.assertIsNone(proposal.action, spelled)
+            self.assertIsNone(guard_verdict(verdict, proposal).override_info, spelled)
+
+
 if __name__ == "__main__":
     unittest.main()

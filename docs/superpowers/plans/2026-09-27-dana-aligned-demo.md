@@ -151,13 +151,13 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 **Files:** Create `app/baseline.py`; modify `app/api.py`, `app/client.py`, `static/index.html`; create `tests/test_baseline.py`
 
-- [ ] `BaselineRAGAgent.run(case_id, planner)`: retrieves policy chunks by keyword over **raw case JSON + case note**,
+- [x] `BaselineRAGAgent.run(case_id, planner)`: retrieves policy chunks by keyword over **raw case JSON + case note**,
       asks the planner for an outcome, and **returns it directly** (no ontology, no guard, no approval). Read-only; never writes.
-- [ ] `POST /api/compare {case_id, planner_mode, lang}` → `{baseline: {...outcome, rationale, would_execute}, governed: AgentDecision}`.
+- [x] `POST /api/compare {case_id, planner_mode, lang}` → `{baseline: {...outcome, rationale, would_execute}, governed: AgentDecision}`.
       The governed side is a normal run (its pending approval remains resumable).
-- [ ] UI: "Compare with generic RAG" toggle → two columns; highlight disagreement in red with the violated rule id.
-- [ ] Offline test with `CompromisedEvalPlanner`: baseline KYC-1044 → `CLEAR, would_execute=approve_account`; governed → `ESCALATE_COMPLIANCE`.
-- [ ] Commit: `feat: side-by-side generic RAG baseline vs ontology-governed agent`.
+- [x] UI: "Compare with generic RAG" toggle → two columns; highlight disagreement in red with the violated rule id.
+- [x] Offline test with `CompromisedEvalPlanner`: baseline KYC-1044 → `CLEAR, would_execute=approve_account`; governed → `ESCALATE_COMPLIANCE`.
+- [x] Commit: `feat: side-by-side generic RAG baseline vs ontology-governed agent`.
 
 ### Task 5: P0 verification
 

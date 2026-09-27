@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
@@ -24,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .agent import KYCExceptionAgent
+from .baseline import MAX_SAMPLES, BaselineRAGAgent, compare_samples, run_samples, select_baseline_planner
 from .checkpointing import make_checkpointer
 from .domain import AgentDecision
 from .tools import DomainTools, ToolError
@@ -46,6 +48,10 @@ class RunRequest(_Body):
     planner_mode: PlannerMode | None = None
     planner: str | None = None
     lang: str = "en"
+
+
+class CompareRequest(RunRequest):
+    samples: int = Field(default=1, ge=1, le=MAX_SAMPLES)
 
 
 class ResumeRequest(_Body):
@@ -75,6 +81,12 @@ class RejectRequest(_Body):
 class RelocalizeRequest(_Body):
     decision_id: str = Field(min_length=1)
     lang: str = "en"
+
+
+class CompareResponse(BaseModel):
+    baseline: dict[str, Any]
+    governed: AgentDecision
+    comparison: dict[str, Any]
 
 
 class HealthResponse(BaseModel):
@@ -180,6 +192,24 @@ def run(request: Request, body: RunRequest):
     return request.app.state.agent.run(
         body.case_id, planner_name=body.planner, lang=body.lang, planner_mode=mode
     )
+
+
+@app.post("/api/compare", response_model=CompareResponse)
+def compare(request: Request, body: CompareRequest):
+    """Run the same case through a generic LLM + RAG baseline (read-only, no
+    guard, no approval gate) and the governed agent, side by side. The governed
+    run is a normal run: its pending approval stays resumable via /api/resume."""
+    mode = body.planner_mode if body.planner_mode is not None else (body.planner or "normal")
+    baseline_planner = select_baseline_planner(mode)  # fails fast (400) on a missing key
+    baseline_agent = BaselineRAGAgent(request.app.state.tools)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending_baseline = pool.submit(run_samples, baseline_agent, body.case_id, baseline_planner, body.samples)
+        governed = request.app.state.agent.run(
+            body.case_id, planner_name=body.planner, lang=body.lang, planner_mode=mode
+        )
+        samples = pending_baseline.result()
+    baseline, comparison = compare_samples(samples, governed.outcome.value, governed.rule)
+    return {"baseline": baseline, "governed": governed, "comparison": comparison}
 
 
 @app.post("/api/resume", response_model=AgentDecision)

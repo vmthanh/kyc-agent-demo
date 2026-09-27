@@ -73,6 +73,7 @@ app/
   policy.py      deterministic policy façade -- the safety boundary, returns PolicyVerdict from the ontology
   ontology.py    executable Cognitive Ontology: validating loader + closed-language rule interpreter
   planner.py     OpenRouter planner seam with normal / compromised_demo modes
+  baseline.py    generic LLM + RAG comparison agent: no ontology, no guard, no approval gate, read-only
   names.py       deterministic name-difference fact: Vietnamese diacritic folding + OCR glyph confusions
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
@@ -308,6 +309,15 @@ by content type:
   with no code change. `tests/test_ontology.py` holds the safety invariants
   (the sanctions hard stop across a grid of inputs) and parity with the
   original hand-coded branches.
+- **Generic LLM + RAG, side by side.** `POST /api/compare` (UI: *Compare with
+  generic RAG*) runs the same case, same model, through `app/baseline.py`: case
+  file and note pasted into an ordinary prompt, keyword retrieval, no ontology,
+  no guard, no approval gate. It is read-only and only reports what it *would*
+  have executed. The baseline is sampled N times (UI: 10) because its answer is
+  not stable under injection: on KYC-1044 with `gpt-4o-mini` at temperature 0 it
+  cleared the 0.91 sanctions hit (and would have auto-approved) in 3 of 10 runs,
+  while the governed agent escalated via `R-AML-01` every time. Numbers vary
+  run to run; the UI shows the live counts.
 - **Expert judgment is a bounded, cited rule.** `R-ID-EXP-01` encodes a senior
   VN KYC reviewer's heuristic: a single-token name mismatch fully explained by
   lost diacritics or OCR glyph confusion (`Trần Minh Anh` vs `Tran Mlnh Anh`), on
