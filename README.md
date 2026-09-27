@@ -101,7 +101,7 @@ tests/
 docs/
   INTERVIEW_GUIDE.md, ARCHITECTURE.md, PRODUCTION_ROADMAP.md, ROUNDS_2_AND_3.md
 slides/
-  index.html     the interview deck: 14 HTML slides, speaker notes, print/export modes
+  index.html     the interview deck: 12 HTML slides, speaker notes, print/export modes
   to_pptx.py     renders index.html to slides/deck.pptx (Chrome + python-pptx)
 ```
 
@@ -158,11 +158,11 @@ uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 
 ## Present the deck
 
-`slides/index.html` is the source of truth for the 14-slide presentation (includes
-committed screenshots under `slides/assets/`) -- open it in
-any browser and present from it directly. Narrative order: problem →
-DanaOS-style mapping → executable ontology → governed authority → generic RAG
-comparison → expert heuristic → measured scorecard → Reflect → limitations. Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
+`slides/index.html` is the source of truth for the 12-slide, plain-language presentation -- open it in
+any browser and present from it directly. Narrative order: problem → the idea in one
+picture → chatbot vs agent → rulebook → three demos (sanctions, blurry name,
+two-person approval) → results → learning from reviewers → honest status.
+Architecture detail is in `slides/index-concise.html`. Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
 (all slides stacked, print-ready), `F` fullscreen.
 
 Export, when a file is needed instead of a browser:

@@ -1,7 +1,7 @@
 # Task 13 report — presentation wrap-up (human rehearsal pending)
 
 ## Delivered
-- `slides/index.html`: 14 slides, as-built architecture/DanaOS-style mapping, executable rules,
+- `slides/index.html`: rewritten as 12 plain-language slides (drawn diagrams, jargon moved to speaker notes); originally 14 slides, as-built architecture/DanaOS-style mapping, executable rules,
   expert boundary case, risk-tiered authority, generic RAG comparison, labelled scorecard,
   Reflect replay/promotion, and explicit POC-vs-production limits.
 - `slides/assets/`: committed WebP captures from the prior synthetic-data UI demos; deck is portable.

@@ -282,7 +282,7 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
   1. Problem in Dana terms (1m) · 2. KYC-1044 compare (3m) · 3. KYC-1043 expert rule + KYC-1046 boundary (3m) ·
   4. KYC-1042 Propose→Verify→Commit + quorum (3m) · 5. Reflect: rejection → candidate → replay → promote (3m) ·
   6. Scorecard + pack reuse (2m) + question: "Which customer workflow would you pilot first?"
-- [x] Update `slides/index.html` (Dana mapping, expert rule, compare screenshot, scorecard, Reflect; 14 slides); update concise deck without breaking its 9-slide contract; keep `tests/test_concise_slides.py` green.
+- [x] Update `slides/index.html` (Dana mapping, expert rule, compare screenshot, scorecard, Reflect; later simplified to 12 plain-language slides); update concise deck without breaking its 9-slide contract; keep `tests/test_concise_slides.py` green.
 - [ ] Rehearse twice with a human presenter and timer (cannot be validated by automated tests). Fallback is documented in `docs/INTERVIEW_GUIDE.md`: offline evals + explicitly recorded scorecard and screenshots.
 - [ ] Commit: `docs: align README, guide, and deck with the Dana-aligned demo`.
 
