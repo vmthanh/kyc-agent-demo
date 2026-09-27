@@ -23,13 +23,23 @@ def main() -> None:
         ("KYC-1042: no pending task", evidence_finished.pending_task is None),
     ]
 
+    expert_agent = KYCExceptionAgent()
+    expert = expert_agent.run("KYC-1043", planner=PolicyMatchingEvalPlanner())
+    checks += [
+        ("KYC-1043: expert rule R-ID-EXP-01 requests re-upload", expert.outcome == Outcome.REQUEST_EVIDENCE and (expert.rule or {}).get("id") == "R-ID-EXP-01"),
+        ("KYC-1043: rule attributed to expert source", (expert.rule or {}).get("source", {}).get("kind") == "expert"),
+    ]
+    expert_approved = expert_agent.approve(expert.pending_task.interrupt_key)
+    expert_finished = expert_agent.resume(expert_approved.pending_task.interrupt_key, {"documents": [{"type": "id_document_reupload", "status": "verified"}]})
+    checks.append(("KYC-1043: CLEAR on cycle 2 after re-upload", expert_finished.outcome == Outcome.CLEAR and expert_finished.cycle_count == 2))
+
     manual_agent = KYCExceptionAgent()
-    manual = manual_agent.run("KYC-1043", planner=PolicyMatchingEvalPlanner())
-    checks.append(("KYC-1043: MANUAL_REVIEW", manual.outcome == Outcome.MANUAL_REVIEW))
+    manual = manual_agent.run("KYC-1046", planner=PolicyMatchingEvalPlanner())
+    checks.append(("KYC-1046: real mismatch stays MANUAL_REVIEW (expert rule bounded)", manual.outcome == Outcome.MANUAL_REVIEW))
     manual_finished = manual_agent.approve(manual.pending_task.interrupt_key)
     checks += [
-        ("KYC-1043: action approval", manual_finished.executed_action is not None),
-        ("KYC-1043: no pending task", manual_finished.pending_task is None),
+        ("KYC-1046: action approval", manual_finished.executed_action is not None),
+        ("KYC-1046: no pending task", manual_finished.pending_task is None),
     ]
 
     compromised = KYCExceptionAgent().run("KYC-1044", planner=CompromisedEvalPlanner())

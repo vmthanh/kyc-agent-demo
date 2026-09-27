@@ -19,7 +19,7 @@ cp .env.example .env
 # set OPENROUTER_API_KEY
 uv run python -m app.api
 uv run python -m evals.openrouter_smoke --case KYC-1045
-uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-proof-of-address
+uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-requested-documents
 uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 ```
 

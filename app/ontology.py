@@ -19,6 +19,9 @@ Loader-enforced safety properties:
 - `hard_stop` rules carry no write action and cannot be shadowed by any
   higher-priority non-hard-stop rule;
 - outcomes and actions come from closed allowlists;
+- a missing fact fails closed (`FactMissingError`) unless a leaf opts in with
+  `"missing": "false"`, which makes that leaf simply not hold. That opt-in is
+  rejected under `not`, so absent evidence can never *enable* a rule;
 - only `status: "active"` rules are evaluated (`candidate`/`retired` rules are
   still validated, so a drafted amendment is checked before anyone reviews it).
 
@@ -43,6 +46,8 @@ COMPARISON_OPS = {"==", "!=", ">=", ">", "<=", "<", "in"}
 UNARY_OPS = {"not_empty", "empty", "is_true", "is_false"}
 RULE_STATUSES = {"active", "candidate", "retired"}
 UNTRUSTED_FIELDS = {"case_note"}
+LEAF_KEYS = {"fact", "op", "value", "missing"}
+MISSING_POLICIES = {"error", "false"}
 
 
 class OntologyError(ValueError):
@@ -162,6 +167,17 @@ class Ontology:
                 return r.cites
         return None
 
+    def rule_view(self, rule_id: str | None, rule_version: str | None = None) -> dict[str, Any] | None:
+        """Audit-friendly attribution of the deciding rule, or None if no rule decided."""
+        if not rule_id:
+            return None
+        try:
+            r = self.rule(rule_id)
+        except KeyError:
+            return {"id": rule_id, "version": rule_version, "cites": None, "source": {}, "description": ""}
+        return {"id": r.id, "version": rule_version or r.version, "cites": r.cites,
+                "source": dict(r.source), "description": r.description}
+
     def path_for(self, rule_id: str | None, rule_version: str | None, outcome: str) -> list[str]:
         """Human-readable lineage: entities the rule reasons over -> rule -> policy -> resolution."""
         try:
@@ -220,7 +236,7 @@ def _parse_rule(raw: dict[str, Any], entities: dict, fact_sources: tuple[str, ..
     return r
 
 
-def _check_condition(cond: Any, r: Rule, fact_sources: tuple[str, ...], where: str) -> None:
+def _check_condition(cond: Any, r: Rule, fact_sources: tuple[str, ...], where: str, negated: bool = False) -> None:
     if not isinstance(cond, dict):
         raise OntologyError(f"{where}: condition must be an object")
     if "all" in cond or "any" in cond:
@@ -228,15 +244,22 @@ def _check_condition(cond: Any, r: Rule, fact_sources: tuple[str, ...], where: s
         if len(cond) != 1 or not isinstance(cond[key], list):
             raise OntologyError(f"{where}: '{key}' must be the only key and hold a list")
         for sub in cond[key]:
-            _check_condition(sub, r, fact_sources, where)
+            _check_condition(sub, r, fact_sources, where, negated)
         return
     if "not" in cond:
         if len(cond) != 1:
             raise OntologyError(f"{where}: 'not' must be the only key")
-        _check_condition(cond["not"], r, fact_sources, where)
+        _check_condition(cond["not"], r, fact_sources, where, not negated)
         return
     if "fact" not in cond or "op" not in cond:
         raise OntologyError(f"{where}: leaf condition needs 'fact' and 'op'")
+    if set(cond) - LEAF_KEYS:
+        raise OntologyError(f"{where}: unknown leaf keys {sorted(set(cond) - LEAF_KEYS)}")
+    missing = cond.get("missing", "error")
+    if missing not in MISSING_POLICIES:
+        raise OntologyError(f"{where}: 'missing' must be one of {sorted(MISSING_POLICIES)}")
+    if missing == "false" and negated:
+        raise OntologyError(f"{where}: 'missing: false' under 'not' would let absent evidence enable a rule")
     _check_fact_path(cond["fact"], fact_sources, where)
     op = cond["op"]
     if op in UNARY_OPS:
@@ -310,6 +333,15 @@ def _holds(cond: dict[str, Any], facts: dict[str, Any], params: dict[str, Any]) 
         return any(_holds(c, facts, params) for c in cond["any"])
     if "not" in cond:
         return not _holds(cond["not"], facts, params)
+    try:
+        return _holds_leaf(cond, facts, params)
+    except FactMissingError:
+        if cond.get("missing", "error") == "false":
+            return False
+        raise
+
+
+def _holds_leaf(cond: dict[str, Any], facts: dict[str, Any], params: dict[str, Any]) -> bool:
     left = _resolve_fact(cond["fact"], facts)
     op = cond["op"]
     if op == "not_empty":

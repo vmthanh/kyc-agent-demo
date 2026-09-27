@@ -145,7 +145,9 @@ class KYCExceptionAgent:
             status = {PendingTaskKind.ACTION_APPROVAL: WorkflowStatus.AWAITING_APPROVAL, PendingTaskKind.DOCUMENT_SUBMISSION: WorkflowStatus.AWAITING_DOCUMENTS, PendingTaskKind.OPERATIONAL_REVIEW: WorkflowStatus.AWAITING_OPERATIONS}[pending_task.kind]
         facts = result.get("facts") or {}
         outcome_value = decision.get("outcome", Outcome.MANUAL_REVIEW.value)
-        ontology_path = load_ontology().path_for(decision.get("rule_id"), decision.get("rule_version"), outcome_value)
+        ontology = load_ontology()
+        ontology_path = ontology.path_for(decision.get("rule_id"), decision.get("rule_version"), outcome_value)
+        rule_view = ontology.rule_view(decision.get("rule_id"), decision.get("rule_version"))
         return AgentDecision(
             case_id=case_id, decision_id=decision_id, outcome=Outcome(decision.get("outcome", Outcome.MANUAL_REVIEW.value)),
             outcome_label=i18n.outcome_label(lang, decision.get("outcome", Outcome.MANUAL_REVIEW.value)), summary=summary,
@@ -160,7 +162,7 @@ class KYCExceptionAgent:
                           "operational_review" if pending_task else result.get("current_node", "finalize")),
             cycle_count=result.get("cycle_count", 1), max_cycles=result.get("max_cycles", 2), pending_task=pending_task,
             planner_attempts=result.get("planner_attempts", 0), planner_usage=proposal.usage if proposal else {},
-            planner_mode=result.get("planner_mode", "normal"),
+            planner_mode=result.get("planner_mode", "normal"), rule=rule_view,
         )
 
     @staticmethod

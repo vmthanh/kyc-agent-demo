@@ -19,8 +19,8 @@ def main() -> None:
     resolution.add_argument("--approve", action="store_true", help="Auto-approve the proposed action, if any.")
     resolution.add_argument("--reject", metavar="REASON", help="Reject the proposed action with an audit reason.")
     parser.add_argument(
-        "--submit-proof-of-address", action="store_true",
-        help="Submit verified proof of address after approving the evidence request.",
+        "--submit-requested-documents", "--submit-proof-of-address", dest="submit_documents", action="store_true",
+        help="Submit the requested documents as verified after approving the evidence request.",
     )
     parser.add_argument(
         "--acknowledge-handoff", action="store_true",
@@ -32,10 +32,11 @@ def main() -> None:
     decision = agent.run(args.case, planner_mode=args.planner, lang=args.lang)
     if args.approve and decision.pending_task and decision.pending_task.kind is PendingTaskKind.ACTION_APPROVAL:
         decision = agent.resume(decision.pending_task.interrupt_key, {"approved": True}, lang=args.lang)
-        if args.submit_proof_of_address and decision.pending_task and decision.pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION:
+        if args.submit_documents and decision.pending_task and decision.pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION:
+            requested = decision.pending_task.payload.get("requested_documents", [])
             decision = agent.resume(
                 decision.pending_task.interrupt_key,
-                {"documents": [{"type": "proof_of_address", "status": "verified"}]},
+                {"documents": [{"type": doc, "status": "verified"} for doc in requested]},
                 lang=args.lang,
             )
     elif args.reject and decision.pending_task and decision.pending_task.kind is PendingTaskKind.ACTION_APPROVAL:

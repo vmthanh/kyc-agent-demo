@@ -65,9 +65,27 @@ class WorkflowEvalDoubleTests(unittest.TestCase):
         self.assertEqual(finished.cycle_count, 2)
         self.assertIsNone(finished.pending_task)
 
-    def test_manual_review_trajectory_executes_approved_action(self) -> None:
+    def test_expert_rule_reupload_trajectory_clears_on_cycle_two(self) -> None:
         agent = KYCExceptionAgent()
         first = agent.run("KYC-1043", planner=PolicyMatchingEvalPlanner())
+        self.assertEqual(first.outcome, Outcome.REQUEST_EVIDENCE)
+        self.assertEqual(first.rule["id"], "R-ID-EXP-01")
+        payload = first.pending_task.payload["action_payload"]
+        self.assertEqual(payload["documents"], ["id_document_reupload"])
+        self.assertEqual(payload["rule"], "R-ID-EXP-01@1.0")
+        approved = agent.approve(first.pending_task.interrupt_key)
+        self.assertEqual(approved.pending_task.payload["requested_documents"], ["id_document_reupload"])
+        # Submitting the wrong document does not satisfy the request.
+        retry = agent.resume(approved.pending_task.interrupt_key, {"documents": [{"type": "proof_of_address", "status": "verified"}]})
+        self.assertEqual(retry.pending_task.kind, PendingTaskKind.DOCUMENT_SUBMISSION)
+        finished = agent.resume(retry.pending_task.interrupt_key, {"documents": [{"type": "id_document_reupload", "status": "verified"}]})
+        self.assertEqual(finished.outcome, Outcome.CLEAR)
+        self.assertEqual(finished.cycle_count, 2)
+        self.assertIsNone(finished.pending_task)
+
+    def test_manual_review_trajectory_executes_approved_action(self) -> None:
+        agent = KYCExceptionAgent()
+        first = agent.run("KYC-1046", planner=PolicyMatchingEvalPlanner())
         self.assertEqual(first.outcome, Outcome.MANUAL_REVIEW)
         self.assertEqual(first.pending_task.kind, PendingTaskKind.ACTION_APPROVAL)
         finished = agent.approve(first.pending_task.interrupt_key)

@@ -42,7 +42,7 @@ class OntologyLoaderTests(unittest.TestCase):
         onto = load_ontology()
         self.assertIn("Customer", onto.entities)
         self.assertTrue(onto.relations)
-        self.assertEqual([r.id for r in onto.rules], ["R-AML-01", "R-ID-01", "R-EVID-01", "R-CLEAR-01"])
+        self.assertEqual([r.id for r in onto.rules], ["R-AML-01", "R-ID-EXP-01", "R-ID-01", "R-EVID-01", "R-CLEAR-01"])
 
     def test_every_rule_cites_a_real_versioned_policy(self) -> None:
         policy_ids = {p["policy_id"] for p in DomainTools().policies}
@@ -166,7 +166,8 @@ class InterpreterParityTests(unittest.TestCase):
 
     def test_shipped_cases_resolve_to_expected_rules(self) -> None:
         tools = DomainTools()
-        expected = {"KYC-1042": "R-EVID-01", "KYC-1043": "R-ID-01", "KYC-1044": "R-AML-01", "KYC-1045": "R-CLEAR-01"}
+        expected = {"KYC-1042": "R-EVID-01", "KYC-1043": "R-ID-EXP-01", "KYC-1044": "R-AML-01",
+                    "KYC-1045": "R-CLEAR-01", "KYC-1046": "R-ID-01"}
         for case_id, rule_id in expected.items():
             payload = {"case_id": case_id}
             f = {name: tools.call(name, "test", payload).output

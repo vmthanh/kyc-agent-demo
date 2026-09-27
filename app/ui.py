@@ -139,7 +139,10 @@ if decision is not None:
                 try:
                     st.session_state.decision = client.resume(
                         decision.pending_task.interrupt_key,
-                        {"documents": [{"type": "proof_of_address", "status": "verified"}]},
+                        {"documents": [
+                            {"type": doc, "status": "verified"}
+                            for doc in decision.pending_task.payload.get("requested_documents", [])
+                        ]},
                         lang=lang,
                     )
                     st.rerun()

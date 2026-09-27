@@ -45,9 +45,9 @@ Stop after any phase and the demo still works end-to-end.
 
 **Files:** `docs/INTERVIEW_GUIDE.md`, `README.md`
 
-- [ ] Replace stale `uv run python -m app.server` with `uv run python -m app.api` in `INTERVIEW_GUIDE.md`.
-- [ ] Add a "Dana mapping" table stub to README (filled in Task 13).
-- [ ] Commit: `docs: fix stale server entrypoint in interview guide`.
+- [x] Replace stale `uv run python -m app.server` with `uv run python -m app.api` in `INTERVIEW_GUIDE.md`.
+- [x] Add a "Dana mapping" table stub to README (filled in Task 13).
+- [x] Commit: `docs: fix stale server entrypoint in interview guide`.
 
 ### Task 1: Executable Cognitive Ontology (rules as data)
 
@@ -86,21 +86,21 @@ Stop after any phase and the demo still works end-to-end.
 - `PolicyVerdict` gains optional `rule_id: str | None = None`, `rule_version: str | None = None`.
 
 **Steps:**
-- [ ] Write failing `tests/test_ontology.py`:
+- [x] Write failing `tests/test_ontology.py`:
   - loader rejects: unknown op, `case_note.*` path, missing fallback, duplicate rule id, unknown outcome;
   - interpreter reproduces current `evaluate()` for all 4 cases + the existing policy unit-test fixtures;
   - **safety invariant test**: for a grid of sanctions scores × doc states, any score ≥ threshold → `ESCALATE_COMPLIANCE` with `action is None`;
   - changing the threshold in an in-memory ontology copy changes the outcome (proves rules are data).
-- [ ] Encode the existing 4 branches as rules `R-AML-01`, `R-ID-01`, `R-EVID-01`, `R-CLEAR-01`.
-- [ ] Implement `app/ontology.py`: `load_ontology(path=None) -> Ontology`, `Ontology.evaluate(facts) -> PolicyVerdict`,
+- [x] Encode the existing 4 branches as rules `R-AML-01`, `R-ID-01`, `R-EVID-01`, `R-CLEAR-01`.
+- [x] Implement `app/ontology.py`: `load_ontology(path=None) -> Ontology`, `Ontology.evaluate(facts) -> PolicyVerdict`,
       `Ontology.tags_for(facts)`, `Ontology.required_policy(reason_key)`, `Ontology.version`.
-- [ ] Rewire `policy.evaluate/tags_for` to a module-level default ontology; keep `SANCTIONS_THRESHOLD`
+- [x] Rewire `policy.evaluate/tags_for` to a module-level default ontology; keep `SANCTIONS_THRESHOLD`
       exported (read from the rule) for backward-compatible imports.
-- [ ] Replace hardcoded `REQUIRED_POLICY_BY_REASON` in `nodes.py` with `ontology.required_policy`.
-- [ ] Replace hardcoded `ONTOLOGY_PATH` in `agent.py` with the matched rule's path
+- [x] Replace hardcoded `REQUIRED_POLICY_BY_REASON` in `nodes.py` with `ontology.required_policy`.
+- [x] Replace hardcoded `ONTOLOGY_PATH` in `agent.py` with the matched rule's path
       (e.g. `Evidence → R-EVID-01 → KYC-EVIDENCE-07 → Resolution`), and add `rule_id`/`rule_version`
       to the trace event of `policy_precheck` and to the action payload's `policy_versions`.
-- [ ] Full suite green. Commit: `feat: evaluate policy from an executable, versioned ontology`.
+- [x] Full suite green. Commit: `feat: evaluate policy from an executable, versioned ontology`.
 
 **Demo moment:** edit `R-AML-01` threshold 0.80 → 0.95 in a scratch copy, rerun KYC-1044 via eval
 harness → outcome changes; revert. "Domain experts change rules; engineers don't ship code."
@@ -115,21 +115,21 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 > Single-token name difference that is OCR-confusable or diacritic-only, liveness passed,
 > tamper < 0.10 → **request a re-upload of the ID image** instead of full manual review.
 
-- [ ] Add a derived fact computed in `verify_documents` tool output (deterministic, unit-tested):
+- [x] Add a derived fact computed in `verify_documents` tool output (deterministic, unit-tested):
       `name_diff: {tokens_differing: int, ocr_confusable: bool, diacritic_only: bool}`
       (strip diacritics via `unicodedata`; small confusable table, e.g. `rn↔m`, `l↔1`, `0↔O`, prefix-truncation `My/Minh`).
-- [ ] Add rule `R-ID-EXP-01` (priority between `R-AML-01` and `R-ID-01`) → outcome `REQUEST_EVIDENCE`,
+- [x] Add rule `R-ID-EXP-01` (priority between `R-AML-01` and `R-ID-01`) → outcome `REQUEST_EVIDENCE`,
       action `request_document`, `documents: ["id_document_reupload"]`, reason_key `ocr_name_mismatch`,
       `source: {"kind": "expert", "ref": "Senior KYC Analyst interview, 2026-09", "captured_by": "FDE"}`.
-- [ ] Add a policy chunk `KYC-IDENTITY-11 §3.2 Low-quality capture` to `policies.json` so the rule is citable,
+- [x] Add a policy chunk `KYC-IDENTITY-11 §3.2 Low-quality capture` to `policies.json` so the rule is citable,
       plus EN/VI `REASON_TEMPLATES["ocr_name_mismatch"]`.
-- [ ] Add case `KYC-1046` — a **real** mismatch (`Nguyen Van Binh` vs `Pham Thi Lan`, 3 tokens) → must stay `MANUAL_REVIEW`.
+- [x] Add case `KYC-1046` — a **real** mismatch (`Nguyen Van Binh` vs `Pham Thi Lan`, 3 tokens) → must stay `MANUAL_REVIEW`.
       This proves the expert rule is bounded, not a loophole.
-- [ ] Resume path: after re-upload with `name_match: true`, cycle 2 reaches `CLEAR` (reuse existing document loop;
+- [x] Resume path: after re-upload with `name_match: true`, cycle 2 reaches `CLEAR` (reuse existing document loop;
       `validate_submission` must accept `id_document_reupload`).
-- [ ] Update tests/evals that assert KYC-1043 → `MANUAL_REVIEW` (now `REQUEST_EVIDENCE` via expert rule); add KYC-1046 assertions.
-- [ ] `AgentDecision` gains optional `rule_source: dict | None` so UI can show "captured from expert".
-- [ ] Commit: `feat: capture an expert OCR-mismatch heuristic as a bounded cognitive rule`.
+- [x] Update tests/evals that assert KYC-1043 → `MANUAL_REVIEW` (now `REQUEST_EVIDENCE` via expert rule); add KYC-1046 assertions.
+- [x] `AgentDecision` gains optional `rule_source: dict | None` so UI can show "captured from expert".
+- [x] Commit: `feat: capture an expert OCR-mismatch heuristic as a bounded cognitive rule`.
 
 ### Task 3: Dana vocabulary in trace and UI
 

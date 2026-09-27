@@ -26,7 +26,7 @@ actively manipulated?**
   (`R-AML-01@1.0`) and cited policy, and the approval payload is bound to that
   rule version. The loader rejects rules that read `case_note`, write actions
   on hard-stop rules, and any rule that would shadow a hard stop.
-- One of the four synthetic cases (`KYC-1044`) carries a prompt-injection
+- One of the five synthetic cases (`KYC-1044`) carries a prompt-injection
   attempt in its free-text case note ("ignore the screening score..."). In
   `compromised_demo`, OpenRouter receives an explicitly compromised prompt;
   the guardrail still forces `ESCALATE_COMPLIANCE`. Deterministic eval
@@ -46,7 +46,7 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 | DanaOS concept | This repo |
 |---|---|
 | Structural ontology | `data/ontology.json` → `structural` (entities, relations) |
-| Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules interpreted by `app/ontology.py` |
+| Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules (policy- and expert-sourced, e.g. `R-ID-EXP-01`) interpreted by `app/ontology.py` |
 | Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → human-approved idempotent gateway |
 | Dana Assurance | *planned*: golden-set replay, impact report, gated rule promotion |
 | See → Think → Act → Reflect | *planned*: trace phases |
@@ -73,6 +73,7 @@ app/
   policy.py      deterministic policy façade -- the safety boundary, returns PolicyVerdict from the ontology
   ontology.py    executable Cognitive Ontology: validating loader + closed-language rule interpreter
   planner.py     OpenRouter planner seam with normal / compromised_demo modes
+  names.py       deterministic name-difference fact: Vietnamese diacritic folding + OCR glyph confusions
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
   agent.py       KYCExceptionAgent façade over the fan-out/fan-in workflow
@@ -83,7 +84,7 @@ app/
   cli.py         terminal demo
 data/
   ontology.json  structural layer (entities, relations) + cognitive layer (versioned, executable rules)
-  cases.json     4 synthetic cases: evidence gap, identity mismatch, sanctions hit (+ injected note), clean pass
+  cases.json     5 synthetic cases: evidence gap, OCR-explainable name mismatch (expert rule), sanctions hit (+ injected note), clean pass, real name mismatch
   policies.json  versioned policy chunks with citations
 evals/
   run_evals.py   deterministic eval doubles + guardrail, route, and rendering regressions
@@ -144,7 +145,8 @@ in-flight approvals. Moving those handles to Redis is the next step, tracked in
 ## Run the CLI demo
 
 ```bash
-uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-proof-of-address
+uv run python -m app.cli --case KYC-1042 --planner normal --approve --submit-requested-documents
+uv run python -m app.cli --case KYC-1043 --planner normal --approve --submit-requested-documents   # expert rule path
 uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 ```
 
@@ -306,6 +308,16 @@ by content type:
   with no code change. `tests/test_ontology.py` holds the safety invariants
   (the sanctions hard stop across a grid of inputs) and parity with the
   original hand-coded branches.
+- **Expert judgment is a bounded, cited rule.** `R-ID-EXP-01` encodes a senior
+  VN KYC reviewer's heuristic: a single-token name mismatch fully explained by
+  lost diacritics or OCR glyph confusion (`Trần Minh Anh` vs `Tran Mlnh Anh`), on
+  a live, untampered capture, gets a clearer ID re-upload request instead of a
+  full manual review (KYC-1043). The difference is measured deterministically
+  by `app/names.py` inside the `verify_documents` tool, the rule cites
+  `KYC-IDENTITY-12` and carries `source.kind = "expert"`, and KYC-1046 (a
+  different person) proves the rule is bounded. Rule leaves that may see absent
+  signals use `"missing": "false"`, which is rejected under `not`, so missing
+  evidence can never enable a relaxation.
 - **The guardrail is the product, not the model.** `policy.py` is pure,
   has no dependency on `planner.py` or `i18n.py`, and is exhaustively unit
   tested. Swapping the OpenRouter model or prompt mode never changes the

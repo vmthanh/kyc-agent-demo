@@ -198,8 +198,15 @@ class AgentEndToEndTests(unittest.TestCase):
         self.assertEqual(approved.executed_action["details"]["documents"], ["proof_of_address"])
 
     def test_identity_mismatch_routes_to_manual_review(self) -> None:
-        result = self.run_heuristic("KYC-1043")
+        result = self.run_heuristic("KYC-1046")
         self.assertEqual(result.outcome, Outcome.MANUAL_REVIEW)
+
+    def test_ocr_explainable_mismatch_requests_reupload_via_expert_rule(self) -> None:
+        result = self.run_heuristic("KYC-1043")
+        self.assertEqual(result.outcome, Outcome.REQUEST_EVIDENCE)
+        self.assertEqual(result.approval.payload["action_payload"]["documents"], ["id_document_reupload"])
+        self.assertEqual(result.rule["id"], "R-ID-EXP-01")
+        self.assertEqual(result.rule["source"]["kind"], "expert")
 
     def test_sanctions_hit_blocks_automatic_action(self) -> None:
         result = self.run_heuristic("KYC-1044")
@@ -333,7 +340,7 @@ class AgentEndToEndTests(unittest.TestCase):
         runs on different cases must not corrupt the shared graph cache, and
         every run must actually complete (a swallowed exception could look
         like a passing, if incomplete, result)."""
-        case_ids = ["KYC-1042", "KYC-1043", "KYC-1044", "KYC-1045"] * 5
+        case_ids = ["KYC-1042", "KYC-1043", "KYC-1044", "KYC-1045", "KYC-1046"] * 4
         results = run_concurrently(
             lambda i: (case_ids[i], self.agent.run(case_ids[i], planner_name="heuristic").outcome),
             len(case_ids),
@@ -341,7 +348,8 @@ class AgentEndToEndTests(unittest.TestCase):
         self.assertEqual(len(results), len(case_ids))
         outcomes = dict(results)
         self.assertEqual(outcomes["KYC-1042"], Outcome.REQUEST_EVIDENCE)
-        self.assertEqual(outcomes["KYC-1043"], Outcome.MANUAL_REVIEW)
+        self.assertEqual(outcomes["KYC-1043"], Outcome.REQUEST_EVIDENCE)
+        self.assertEqual(outcomes["KYC-1046"], Outcome.MANUAL_REVIEW)
         self.assertEqual(outcomes["KYC-1044"], Outcome.ESCALATE_COMPLIANCE)
         self.assertEqual(outcomes["KYC-1045"], Outcome.CLEAR)
 

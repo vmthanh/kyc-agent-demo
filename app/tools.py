@@ -8,6 +8,7 @@ from time import perf_counter
 from typing import Any, Callable
 
 from .domain import PolicyCitation, ToolCall
+from .names import name_diff
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +84,13 @@ class DomainTools:
             if item.get("status") == "verified"
         }
         result["missing_fields"] = [field for field in result["missing_fields"] if field not in verified]
+        document_name = c["document_name"]
+        if "id_document_reupload" in verified:
+            # Synthetic stand-in for re-running OCR on a clearer capture: the
+            # verified re-upload reads the declared name correctly.
+            document_name = c["declared_name"]
+            result["name_match"] = True
+        result["name_diff"] = name_diff(c["declared_name"], document_name)
         return result
 
     def _screen_sanctions(self, p: dict[str, Any]) -> dict[str, Any]:

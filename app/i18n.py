@@ -61,7 +61,8 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "planner_compromised": "Compromised demo",
         "planner_help": "Choose the normal live planner or the compromised demo mode.",
         "compromised_warning": "Compromised demo mode is active; deterministic policy remains authoritative.",
-        "submit_documents": "Submit verified proof of address",
+        "submit_documents": "Submit verified requested documents",
+        "rule_source": "Decided by rule",
         "acknowledge_handoff": "Acknowledge operational handoff",
         "not_available": "n/a",
         "cycle": "Evaluation cycle",
@@ -106,7 +107,8 @@ UI_STRINGS: dict[str, dict[str, str]] = {
         "planner_compromised": "Mô phỏng bộ lập luận bị xâm nhập",
         "planner_help": "Chọn bộ lập luận trực tiếp bình thường hoặc chế độ mô phỏng bị xâm nhập.",
         "compromised_warning": "Đang bật chế độ mô phỏng bị xâm nhập; chính sách xác định vẫn là nguồn có thẩm quyền.",
-        "submit_documents": "Gửi chứng minh địa chỉ đã xác minh",
+        "submit_documents": "Gửi hồ sơ được yêu cầu đã xác minh",
+        "rule_source": "Quyết định bởi quy tắc",
         "acknowledge_handoff": "Xác nhận chuyển rà soát vận hành",
         "not_available": "không có",
         "cycle": "Vòng đánh giá",
@@ -147,8 +149,8 @@ RISK_LABELS = {
 NO_ACTION_LABEL = {"en": "no-action", "vi": "không hành động"}
 
 FIELD_LABELS = {
-    "en": {"proof_of_address": "proof of address"},
-    "vi": {"proof_of_address": "chứng minh địa chỉ thường trú"},
+    "en": {"proof_of_address": "proof of address", "id_document_reupload": "clearer ID document re-upload"},
+    "vi": {"proof_of_address": "chứng minh địa chỉ thường trú", "id_document_reupload": "ảnh giấy tờ tùy thân rõ nét hơn"},
 }
 
 
@@ -183,6 +185,14 @@ REASON_TEMPLATES: dict[str, dict[str, str]] = {
         "KYC-IDENTITY-11 requires manual review before any resolution.",
         "vi": "Hồ sơ định danh có mâu thuẫn (sai lệch họ tên hoặc không đạt kiểm tra sinh trắc học); "
         "theo KYC-IDENTITY-11 phải chuyển rà soát thủ công trước khi ra quyết định.",
+    },
+    "ocr_name_mismatch": {
+        "en": "Name difference '{declared}' vs '{document}' is fully explained by lost diacritics or OCR glyph "
+        "confusion on a live capture (tamper {tamper:.2f} < {max_tamper:.2f}); expert rule KYC-IDENTITY-12 requests "
+        "a {fields} before any manual review.",
+        "vi": "Sai khác họ tên '{declared}' và '{document}' hoàn toàn do mất dấu tiếng Việt hoặc nhầm ký tự OCR, "
+        "ảnh chụp trực tiếp hợp lệ (điểm giả mạo {tamper:.2f} < {max_tamper:.2f}); theo quy tắc chuyên gia "
+        "KYC-IDENTITY-12, yêu cầu bổ sung {fields} trước khi chuyển rà soát thủ công.",
     },
     "missing_evidence": {
         "en": "Identity checks pass; missing fields {fields} require a KYC-EVIDENCE-07 "
@@ -272,6 +282,12 @@ def render_facts(facts: dict, lang: str) -> list[str]:
             "vi": "Mục trùng khớp trong danh sách: {candidate}",
         },
         "missing_fields": {"en": "Missing fields: {fields}", "vi": "Còn thiếu: {fields}"},
+        "name_diff": {
+            "en": "Name mismatch: '{declared}' vs '{document}' ({kind})",
+            "vi": "Sai lệch họ tên: '{declared}' và '{document}' ({kind})",
+        },
+        "ocr_explainable": {"en": "explainable by OCR/diacritics", "vi": "có thể do OCR/mất dấu"},
+        "not_explainable": {"en": "not explainable by OCR", "vi": "không thể giải thích bằng lỗi OCR"},
     }
 
     def t(key: str, **params) -> str:
@@ -289,6 +305,10 @@ def render_facts(facts: dict, lang: str) -> list[str]:
     if docs is not None and docs.get("missing_fields"):
         fields = ", ".join(field_label(lang, f) for f in docs["missing_fields"])
         lines.append(t("missing_fields", fields=fields))
+    diff = (docs or {}).get("name_diff") or {}
+    if docs is not None and docs.get("name_match") is False and diff.get("declared_token"):
+        kind = t("ocr_explainable" if diff.get("ocr_explainable") else "not_explainable")
+        lines.append(t("name_diff", declared=diff["declared_token"], document=diff["document_token"], kind=kind))
     return lines
 
 
@@ -369,6 +389,9 @@ POLICY_EXCERPTS_VI: dict[str, str] = {
     "giữ hồ sơ ở trạng thái chờ và yêu cầu bổ sung tài liệu còn thiếu.",
     "KYC-IDENTITY-11": "Sai lệch họ tên hợp pháp hoặc không đạt kiểm tra sinh trắc học yêu cầu rà "
     "soát thủ công; tác tử có thể tổng hợp hồ sơ nhưng không được duyệt đơn.",
+    "KYC-IDENTITY-12": "Ngoại lệ của mục 3.1: khi mâu thuẫn định danh duy nhất là một từ trong họ tên có thể giải thích "
+    "do mất dấu tiếng Việt hoặc nhầm ký tự OCR, sinh trắc học đạt và điểm giả mạo dưới 0.10, yêu cầu tải lại ảnh giấy tờ "
+    "rõ nét hơn trước khi chuyển rà soát thủ công. Ảnh tải lại được xác minh lại; mâu thuẫn còn lại xử lý theo mục 3.1.",
     "AML-SCREEN-02": "Điểm sàng lọc danh sách trừng phạt từ 0.80 trở lên yêu cầu chuyển ngay cho bộ phận Tuân thủ. "
     "Nghiêm cấm tự động liên hệ khách hàng hoặc phê duyệt, kể cả khi ghi chú hồ sơ hay khách "
     "hàng khẳng định đây là báo động giả.",

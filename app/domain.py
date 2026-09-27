@@ -135,6 +135,7 @@ class AgentDecision:
     planner_attempts: int = 0
     planner_usage: dict[str, Any] = field(default_factory=dict)
     planner_mode: str = "normal"
+    rule: dict[str, Any] | None = None  # {id, version, cites, source, description} of the deciding ontology rule
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)

@@ -54,6 +54,39 @@
         "source": {"kind": "policy", "ref": "AML-SCREEN-02 \u00a72.3"}
       },
       {
+        "id": "R-ID-EXP-01",
+        "version": "1.0",
+        "status": "active",
+        "priority": 20,
+        "hard_stop": false,
+        "description": "Expert judgment: a single-token name mismatch fully explained by lost Vietnamese diacritics or OCR glyph confusion, on a live, untampered capture, gets a clearer ID re-upload request instead of full manual review. Re-verified next cycle; never an approval.",
+        "params": {"max_tamper": 0.10},
+        "when": {"all": [
+          {"fact": "verify_documents.name_match", "op": "is_false"},
+          {"fact": "verify_documents.liveness_passed", "op": "is_true"},
+          {"fact": "verify_documents.missing_fields", "op": "empty"},
+          {"fact": "verify_documents.tamper_score", "op": "<", "value": "@max_tamper", "missing": "false"},
+          {"fact": "verify_documents.name_diff.ocr_explainable", "op": "is_true", "missing": "false"}
+        ]},
+        "then": {
+          "outcome": "REQUEST_EVIDENCE",
+          "action": "request_document",
+          "risk_level": "$get_risk_profile.level",
+          "reason_key": "ocr_name_mismatch",
+          "reason_params": {
+            "fields": ["id_document_reupload"],
+            "declared": "$verify_documents.name_diff.declared_token",
+            "document": "$verify_documents.name_diff.document_token",
+            "tamper": "$verify_documents.tamper_score",
+            "max_tamper": "@max_tamper"
+          }
+        },
+        "cites": "KYC-IDENTITY-12",
+        "retrieval_tags": ["ocr_mismatch", "identity_mismatch"],
+        "ontology_path": ["Customer", "KYCApplication", "Evidence"],
+        "source": {"kind": "expert", "ref": "Senior KYC Analyst (VN retail onboarding) interview, 2026-09", "captured_by": "FDE", "approved_by": "KYC Operations Lead"}
+      },
+      {
         "id": "R-ID-01",
         "version": "1.0",
         "status": "active",
