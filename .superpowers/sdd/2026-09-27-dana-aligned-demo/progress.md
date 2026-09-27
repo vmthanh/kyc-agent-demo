@@ -15,6 +15,6 @@ Baseline (2026-09-27): `uv run python -m unittest discover -s tests` → 139 tes
 | 6 Golden set + scorecard | ✅ done | e7230cb | 205 OK, evals 22/22 | live: governed 100%/0 unsafe vs baseline 71.7%/2 unsafe; see `task-6-report.md` |
 | 7 Reflect loop | ✅ done | f248c61 | 214 OK, evals 22/22 | signal→draft→replay→approve→promote; unsafe change blocked (9 regressions); see `task-7-report.md` |
 | 8 Authority matrix | ✅ done | 5f08f8a | 222 OK, evals 24/24 | risk-tiered maker-checker; promotion = KYC Lead + Compliance; see `task-8-report.md` |
-| 9 Local small model | ⚠️ integration done; local benchmark pending | see git log | 228 OK, evals 24/24 | local endpoint mocked; hosted 7–8B failed schema; no model downloaded; see `task-9-report.md` |
+| 9 Local small model | ⚠️ integration done; local benchmark pending | e798cf1 | 228 OK, evals 24/24 | local endpoint mocked; hosted 7–8B failed schema; no model downloaded; see `task-9-report.md` |
 | **P1 phase** | ⚠️ implementation complete; local benchmark pending | | | |
 | 10–13 (P2, wrap) | ⬜ todo | | | |
