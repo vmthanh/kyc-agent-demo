@@ -32,6 +32,21 @@ actively manipulated?**
 - The whole thing renders in English or Vietnamese, chosen per request, with
   zero added network dependency for anything templated.
 
+## Dana mapping
+
+How this POC maps to Aitomatic's DanaOS concepts. Rows marked *planned* are
+tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
+
+| DanaOS concept | This repo |
+|---|---|
+| Structural ontology | `data/ontology.json` → `structural` (entities, relations) |
+| Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules interpreted by `app/ontology.py` |
+| Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → human-approved idempotent gateway |
+| Dana Assurance | *planned*: golden-set replay, impact report, gated rule promotion |
+| See → Think → Act → Reflect | *planned*: trace phases |
+| Sovereign / small models | *planned*: local planner mode |
+| Vertical packs | *planned*: `packs/kyc`, `packs/boiler` |
+
 ## Architecture and stack
 
 | Layer | Choice | Why |
