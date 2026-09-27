@@ -29,6 +29,24 @@ PLANNER_MAX_INTERVAL = 2.0
 
 MAX_SUBMISSION_ATTEMPTS = 3
 
+# Dana-style operating loop: See (grounded reads) -> Think (policy + model) ->
+# Act (governed writes and human tasks) -> Reflect (close out and learn).
+PHASE_BY_STEP = {
+    **dict.fromkeys(("intake", "load_customer", "verify_documents", "screen_watchlists", "load_risk", "evidence_gate"), "SEE"),
+    **dict.fromkeys(("retrieve_policy", "policy_precheck", "openrouter_reason", "reconcile_guard"), "THINK"),
+    **dict.fromkeys(("action_review", "execute_action", "await_documents", "validate_submission",
+                     "increment_cycle", "operational_review"), "ACT"),
+    "finalize": "REFLECT",
+}
+# Governed write: the model PROPOSEs, the ontology guard VERIFYs, and only a
+# human-approved, idempotent gateway call COMMITs.
+GOV_STAGE_BY_STEP = {
+    "openrouter_reason": "PROPOSE",
+    "reconcile_guard": "VERIFY",
+    "action_review": "COMMIT",
+    "execute_action": "COMMIT",
+}
+
 
 @dataclass(frozen=True)
 class NodeError:
@@ -57,6 +75,7 @@ class WorkflowNodes:
         detail: str,
         status: str = "complete",
         runtime: Any = None,
+        metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return {
             "step": step,
@@ -66,7 +85,9 @@ class WorkflowNodes:
             "cycle": state.get("cycle_count", 1),
             "duration_ms": 0,
             "attempt": WorkflowNodes._attempt(runtime),
-            "metadata": {},
+            "metadata": dict(metadata or {}),
+            "phase": PHASE_BY_STEP.get(step),
+            "gov_stage": GOV_STAGE_BY_STEP.get(step),
         }
 
     def event(
@@ -332,7 +353,7 @@ class WorkflowNodes:
             "trace": [self._event(
                 state, "action_review", "Human action review",
                 "Action approval recorded" if response["approved"] else f"Reviewer rejected: {review['reason']}",
-                runtime=runtime,
+                runtime=runtime, metadata={"approved": response["approved"]},
             )],
         }
         if not response["approved"]:

@@ -144,6 +144,7 @@ class KYCExceptionAgent:
         if pending_task:
             status = {PendingTaskKind.ACTION_APPROVAL: WorkflowStatus.AWAITING_APPROVAL, PendingTaskKind.DOCUMENT_SUBMISSION: WorkflowStatus.AWAITING_DOCUMENTS, PendingTaskKind.OPERATIONAL_REVIEW: WorkflowStatus.AWAITING_OPERATIONS}[pending_task.kind]
         facts = result.get("facts") or {}
+        governance = self._governance(result)
         outcome_value = decision.get("outcome", Outcome.MANUAL_REVIEW.value)
         ontology = load_ontology()
         ontology_path = ontology.path_for(decision.get("rule_id"), decision.get("rule_version"), outcome_value)
@@ -163,7 +164,26 @@ class KYCExceptionAgent:
             cycle_count=result.get("cycle_count", 1), max_cycles=result.get("max_cycles", 2), pending_task=pending_task,
             planner_attempts=result.get("planner_attempts", 0), planner_usage=proposal.usage if proposal else {},
             planner_mode=result.get("planner_mode", "normal"), rule=rule_view,
+            governance=governance,
         )
+
+    @staticmethod
+    def _governance(result: dict[str, Any]) -> dict[str, int]:
+        """Governed-operation counters across every cycle of this run."""
+        trace = result.get("trace") or []
+
+        def count(step: str, predicate=lambda e: True) -> int:
+            return sum(1 for e in trace if e.get("step") == step and predicate(e))
+
+        return {
+            "reads": len(result.get("tool_calls") or []),
+            "proposals": count("openrouter_reason", lambda e: e.get("status") == "complete"),
+            "verifications": count("reconcile_guard"),
+            "overrides": count("reconcile_guard", lambda e: e.get("status") == "override"),
+            "approvals": count("action_review", lambda e: (e.get("metadata") or {}).get("approved") is True),
+            "rejections": count("action_review", lambda e: (e.get("metadata") or {}).get("approved") is False),
+            "writes": count("execute_action", lambda e: e.get("status") == "complete"),
+        }
 
     @staticmethod
     def _render_rationale(proposal: LLMProposal | None, lang: str) -> tuple[str | None, bool]:

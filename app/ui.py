@@ -91,6 +91,13 @@ if decision is not None:
             confidence_note += f"  \n{i18n.ui_text(lang, 'translation_unavailable')}"
         st.caption(confidence_note)
 
+        if decision.rule:
+            rule = decision.rule
+            kind = (rule.get("source") or {}).get("kind", "policy")
+            st.info(
+                f"**{i18n.ui_text(lang, 'rule_source')}: {rule['id']}@{rule['version']}** "
+                f"({kind}) · {rule.get('cites') or ''}  \n{rule.get('description', '')}"
+            )
         st.markdown(f"**{i18n.ui_text(lang, 'ontology_path')}**")
         st.write(" -> ".join(decision.ontology_path))
 
@@ -174,10 +181,13 @@ if decision is not None:
         st.caption(f"{i18n.ui_text(lang, 'planner_attempts')}: {decision.planner_attempts}")
         usage = decision.planner_usage or {}
         st.caption(f"{usage.get('total_tokens', 0)} {i18n.ui_text(lang, 'tokens')} · {i18n.ui_text(lang, 'cost')}: {usage.get('cost', i18n.ui_text(lang, 'not_available'))}")
+        gov = decision.governance or {}
+        st.caption(" · ".join(f"{k} {v}" for k, v in gov.items()))
         st.subheader(i18n.ui_text(lang, "agent_trace"))
         for event in decision.trace:
             icon = "\U0001f6a8" if event.status == "override" else "\u26a0\ufe0f" if event.status == "degraded" else "\u2022"
-            st.markdown(f"{icon} **{event.title}**")
+            stage = " · ".join(x for x in (event.phase, event.gov_stage) if x)
+            st.markdown(f"{icon} `{stage}` **{event.title}**" if stage else f"{icon} **{event.title}**")
             st.caption(event.detail)
 
         st.subheader(i18n.ui_text(lang, "tool_inspection"))

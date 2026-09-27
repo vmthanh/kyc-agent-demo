@@ -49,7 +49,7 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 | Cognitive ontology | `data/ontology.json` → `cognitive.rules`: versioned, executable rules (policy- and expert-sourced, e.g. `R-ID-EXP-01`) interpreted by `app/ontology.py` |
 | Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → human-approved idempotent gateway |
 | Dana Assurance | *planned*: golden-set replay, impact report, gated rule promotion |
-| See → Think → Act → Reflect | *planned*: trace phases |
+| See → Think → Act → Reflect | every trace event carries `phase`; governed steps carry `gov_stage` (PROPOSE/VERIFY/COMMIT); `AgentDecision.governance` counts reads, writes, approvals, overrides |
 | Sovereign / small models | *planned*: local planner mode |
 | Vertical packs | *planned*: `packs/kyc`, `packs/boiler` |
 

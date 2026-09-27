@@ -72,6 +72,8 @@ class TraceEvent:
     attempt: int = 1
     route: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    phase: str | None = None  # SEE | THINK | ACT | REFLECT
+    gov_stage: str | None = None  # PROPOSE | VERIFY | COMMIT for governed-write steps
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,7 @@ class AgentDecision:
     planner_attempts: int = 0
     planner_usage: dict[str, Any] = field(default_factory=dict)
     planner_mode: str = "normal"
+    governance: dict[str, int] = field(default_factory=dict)  # reads/writes/proposals/overrides/approvals/rejections
     rule: dict[str, Any] | None = None  # {id, version, cites, source, description} of the deciding ontology rule
 
     def to_dict(self) -> dict[str, Any]:

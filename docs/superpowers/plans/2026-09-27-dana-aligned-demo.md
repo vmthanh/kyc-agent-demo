@@ -135,17 +135,17 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 **Files:** `app/workflow/nodes.py` (event metadata), `app/i18n.py`, `static/index.html`, `app/ui.py`
 
-- [ ] Add `phase` to every trace event: `SEE` (intake, 4 reads, evidence_gate), `THINK` (retrieve_policy,
+- [x] Add `phase` to every trace event: `SEE` (intake, 4 reads, evidence_gate), `THINK` (retrieve_policy,
       policy_precheck, openrouter_reason, reconcile_guard), `ACT` (action_review, execute_action,
       await_documents, validate_submission), `REFLECT` (finalize; Task 7 fills it).
-- [ ] Add `gov_stage` on the three governance events: `PROPOSE` (openrouter_reason), `VERIFY` (reconcile_guard),
+- [x] Add `gov_stage` on the three governance events: `PROPOSE` (openrouter_reason), `VERIFY` (reconcile_guard),
       `COMMIT` (execute_action).
-- [ ] `AgentDecision` gains `governance: {reads: int, writes: int, proposals: int, overrides: int, approvals: int}`
+- [x] `AgentDecision` gains `governance: {reads: int, writes: int, proposals: int, overrides: int, approvals: int}`
       computed in `agent.py` from trace/tool_calls.
-- [ ] Static UI: group nodes into four phase columns; badges `Gov. read N / Gov. write N`; label the guard
+- [x] Static UI: group nodes into four phase columns; badges `Gov. read N / Gov. write N`; label the guard
       card "Propose → Verify → Commit". EN/VI strings.
-- [ ] Tests: surface tests assert `phase` present on all events and governance counters for KYC-1042 cycle 1 (reads=4, writes=0).
-- [ ] Commit: `feat: expose See/Think/Act/Reflect phases and governance counters`.
+- [x] Tests: surface tests assert `phase` present on all events and governance counters for KYC-1042 cycle 1 (reads=4, writes=0).
+- [x] Commit: `feat: expose See/Think/Act/Reflect phases and governance counters`.
 
 ### Task 4: "Generic LLM + RAG" baseline for side-by-side
 
