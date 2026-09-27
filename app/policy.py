@@ -1,8 +1,11 @@
 """Deterministic policy engine.
 
-This module is the safety boundary of the agent. It is pure (no I/O, no
-model calls, no language) and cheap to unit test exhaustively. `evaluate()`
-computes the mandated outcome directly from typed, tool-sourced facts.
+This module is the safety boundary of the agent. It holds no business rules
+of its own: `evaluate()` asks the executable Cognitive Ontology
+(`app/ontology.py` over `data/ontology.json`) for the first matching,
+versioned rule and returns it as a typed `PolicyVerdict` that names the rule
+(`rule_id@rule_version`) and the policy it cites. It is pure (no network, no
+model calls, no language) and cheap to unit test exhaustively.
 `guard()` compares that mandate against the live planner or an eval double
 and always keeps the mandate -- the model may explain and
 add nuance, but it can never talk its way past a compliance stop, an
@@ -19,8 +22,19 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .domain import LLMProposal, Outcome
+from .ontology import Ontology, load_ontology
 
-SANCTIONS_THRESHOLD = 0.80
+
+def _sanctions_threshold(ontology: Ontology) -> float:
+    """Read the hard-stop screening threshold from the ontology (display/back-compat only)."""
+    for rule in ontology.rules:
+        if rule.hard_stop and "threshold" in rule.params:
+            return float(rule.params["threshold"])
+    raise LookupError("ontology defines no hard-stop screening threshold")
+
+
+# Kept for backward-compatible imports; the ontology file is the source of truth.
+SANCTIONS_THRESHOLD = _sanctions_threshold(load_ontology())
 
 
 @dataclass(frozen=True)
@@ -30,54 +44,28 @@ class PolicyVerdict:
     risk_level: str
     reason_key: str
     reason_params: dict[str, Any] = field(default_factory=dict)
+    rule_id: str | None = None
+    rule_version: str | None = None
+    cites: str | None = None
 
 
-def evaluate(facts: dict[str, Any]) -> PolicyVerdict:
+def evaluate(facts: dict[str, Any], ontology: Ontology | None = None) -> PolicyVerdict:
     """Recompute the mandated outcome from grounded, typed facts only.
 
-    Branch order matters and is exhaustive: a sanctions hit always wins,
-    then identity integrity, then evidence completeness, then the
-    no-exception case. Nothing here reads free-text case notes.
+    Rule order (hard stops first, fallback last) and the closed rule language
+    are enforced when the ontology loads. Nothing here reads free-text case
+    notes: the loader rejects any rule that references `case_note`.
     """
-    docs = facts["verify_documents"]
-    sanctions = facts["screen_sanctions"]
-    risk = facts["get_risk_profile"]
-
-    if sanctions["match_score"] >= SANCTIONS_THRESHOLD:
-        return PolicyVerdict(
-            Outcome.ESCALATE_COMPLIANCE,
-            None,
-            "CRITICAL",
-            "sanctions_hit",
-            {"score": sanctions["match_score"], "threshold": SANCTIONS_THRESHOLD},
-        )
-    if not docs["name_match"] or not docs["liveness_passed"]:
-        return PolicyVerdict(Outcome.MANUAL_REVIEW, "open_manual_review", "HIGH", "identity_conflict")
-    if docs["missing_fields"]:
-        return PolicyVerdict(
-            Outcome.REQUEST_EVIDENCE,
-            "request_document",
-            risk["level"],
-            "missing_evidence",
-            {"fields": list(docs["missing_fields"])},
-        )
-    return PolicyVerdict(Outcome.CLEAR, None, risk["level"], "clear")
+    match = (ontology or load_ontology()).evaluate(facts)
+    return PolicyVerdict(
+        match.outcome, match.action, match.risk_level, match.reason_key, match.reason_params,
+        rule_id=match.rule.id, rule_version=match.rule.version, cites=match.rule.cites,
+    )
 
 
-def tags_for(facts: dict[str, Any]) -> set[str]:
-    """Policy-retrieval tags derived from the same branch logic as `evaluate`."""
-    docs = facts["verify_documents"]
-    sanctions = facts["screen_sanctions"]
-    tags = {"kyc", "risk_tier"}
-    if sanctions["match_score"] >= SANCTIONS_THRESHOLD:
-        tags.add("sanctions")
-    elif not docs["name_match"] or not docs["liveness_passed"]:
-        tags.add("identity_mismatch")
-    elif docs["missing_fields"]:
-        tags.add("missing_evidence")
-    else:
-        tags.add("clear")
-    return tags
+def tags_for(facts: dict[str, Any], ontology: Ontology | None = None) -> set[str]:
+    """Policy-retrieval tags: the ontology's base tags plus the matched rule's tags."""
+    return (ontology or load_ontology()).tags_for(facts)
 
 
 @dataclass(frozen=True)

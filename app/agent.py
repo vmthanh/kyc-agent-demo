@@ -9,13 +9,11 @@ from langgraph.types import Command
 
 from . import i18n
 from .domain import AgentDecision, ApprovalRequest, LLMProposal, Outcome, PendingTask, PendingTaskKind, PolicyCitation, ToolCall, TraceEvent, WorkflowStatus
+from .ontology import load_ontology
 from .planner import Planner, select_planner
 from .tools import DomainTools
 from .workflow.graph import build_workflow_graph
 from .workflow.state import initial_state
-
-ONTOLOGY_PATH = ["Customer", "KYCApplication", "Evidence", "RiskFinding", "Policy", "Resolution"]
-
 
 class KYCExceptionAgent:
     def __init__(self, tools: DomainTools | None = None, checkpointer: Any | None = None) -> None:
@@ -146,6 +144,8 @@ class KYCExceptionAgent:
         if pending_task:
             status = {PendingTaskKind.ACTION_APPROVAL: WorkflowStatus.AWAITING_APPROVAL, PendingTaskKind.DOCUMENT_SUBMISSION: WorkflowStatus.AWAITING_DOCUMENTS, PendingTaskKind.OPERATIONAL_REVIEW: WorkflowStatus.AWAITING_OPERATIONS}[pending_task.kind]
         facts = result.get("facts") or {}
+        outcome_value = decision.get("outcome", Outcome.MANUAL_REVIEW.value)
+        ontology_path = load_ontology().path_for(decision.get("rule_id"), decision.get("rule_version"), outcome_value)
         return AgentDecision(
             case_id=case_id, decision_id=decision_id, outcome=Outcome(decision.get("outcome", Outcome.MANUAL_REVIEW.value)),
             outcome_label=i18n.outcome_label(lang, decision.get("outcome", Outcome.MANUAL_REVIEW.value)), summary=summary,
@@ -154,7 +154,7 @@ class KYCExceptionAgent:
             tool_calls=[ToolCall(**c) for c in result.get("tool_calls", [])], trace=[TraceEvent(**t) for t in result.get("trace", [])],
             model=proposal.model if proposal else None, llm_rationale=rationale, lang=lang, rationale_translated=translated,
             guardrail_override=override, approval=approval, executed_action=action_result if action_result.get("status") == "executed" else None,
-            review_result=review_view, ontology_path=ONTOLOGY_PATH, workflow_status=status,
+            review_result=review_view, ontology_path=ontology_path, workflow_status=status,
             current_node=("action_review" if pending_task and pending_task.kind is PendingTaskKind.ACTION_APPROVAL else
                           "await_documents" if pending_task and pending_task.kind is PendingTaskKind.DOCUMENT_SUBMISSION else
                           "operational_review" if pending_task else result.get("current_node", "finalize")),

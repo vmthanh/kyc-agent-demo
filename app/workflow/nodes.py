@@ -14,17 +14,10 @@ from langgraph.types import interrupt
 
 from ..domain import LLMProposal, Outcome, PolicyCitation
 from ..planner import Planner, PlannerUnavailableError
+from ..ontology import load_ontology
 from ..policy import PolicyVerdict, evaluate, guard_verdict, tags_for
 from ..tools import DomainTools, action_idempotency_key
 from .state import WorkflowState
-
-
-REQUIRED_POLICY_BY_REASON = {
-    "sanctions_hit": "AML-SCREEN-02",
-    "identity_conflict": "KYC-IDENTITY-11",
-    "missing_evidence": "KYC-EVIDENCE-07",
-    "clear": "KYC-CLEAR-01",
-}
 
 # The LLM node fails closed on its own (see `openrouter_reason`); it never
 # raises past this module, so no LangGraph retry_policy/error_handler is
@@ -170,7 +163,9 @@ class WorkflowNodes:
         verdict = evaluate(state["facts"])
         serialized = asdict(verdict)
         serialized["outcome"] = verdict.outcome.value
-        required = REQUIRED_POLICY_BY_REASON.get(verdict.reason_key)
+        # The matched rule names the policy it implements; precheck fails closed
+        # if retrieval did not surface that exact policy.
+        required = verdict.cites or load_ontology().required_policy(verdict.reason_key)
         citation_ids = {
             citation.get("policy_id") if isinstance(citation, dict) else citation.policy_id
             for citation in state.get("citations", [])
@@ -190,7 +185,7 @@ class WorkflowNodes:
         return {
             "policy_verdict": serialized,
             "policy_status": "ok",
-            "trace": [self._event(state, "policy_precheck", "Compute mandatory policy outcome", f"Precheck requires {verdict.outcome.value}", runtime=runtime)],
+            "trace": [self._event(state, "policy_precheck", "Compute mandatory policy outcome", f"Precheck requires {verdict.outcome.value} via rule {verdict.rule_id}@{verdict.rule_version} ({verdict.cites})", runtime=runtime)],
         }
 
     def openrouter_reason(self, state: WorkflowState, runtime: Any = None) -> dict[str, Any]:
@@ -240,6 +235,10 @@ class WorkflowNodes:
                     f"{citation['policy_id']}:{citation['version']}" for citation in state.get("citations", [])
                 ),
             }
+            # Bind the approval to the exact rule version: a rule change yields a
+            # new payload, hence a new idempotency key and a fresh approval.
+            if result.verdict.rule_id:
+                payload["rule"] = f"{result.verdict.rule_id}@{result.verdict.rule_version}"
             if result.verdict.action == "request_document":
                 payload["documents"] = sorted(result.verdict.reason_params.get("fields", []))
         decision = {
@@ -248,6 +247,8 @@ class WorkflowNodes:
             "risk_level": result.verdict.risk_level,
             "reason_key": result.verdict.reason_key,
             "reason_params": result.verdict.reason_params,
+            "rule_id": result.verdict.rule_id,
+            "rule_version": result.verdict.rule_version,
             "action_payload": payload,
             "guardrail_override": result.override_info,
         }
@@ -270,13 +271,16 @@ class WorkflowNodes:
         else degrades to a manual review with no automated action."""
         verdict = dict(state.get("policy_verdict") or {})
         if verdict.get("outcome") != Outcome.ESCALATE_COMPLIANCE.value:
-            verdict.update({"outcome": Outcome.MANUAL_REVIEW.value, "action": None, "reason_key": "ai_unavailable", "reason_params": {}})
+            verdict.update({"outcome": Outcome.MANUAL_REVIEW.value, "action": None, "reason_key": "ai_unavailable", "reason_params": {},
+                            "rule_id": None, "rule_version": None})
         decision = {
             "outcome": verdict.get("outcome"),
             "action": verdict.get("action"),
             "risk_level": verdict.get("risk_level", "UNKNOWN"),
             "reason_key": verdict.get("reason_key"),
             "reason_params": verdict.get("reason_params", {}),
+            "rule_id": verdict.get("rule_id"),
+            "rule_version": verdict.get("rule_version"),
             "action_payload": None,
             "guardrail_override": None,
         }

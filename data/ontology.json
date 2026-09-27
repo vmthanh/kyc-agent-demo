@@ -1,27 +1,124 @@
 {
-  "version": "1.0",
-  "entities": {
-    "Customer": ["customer_id", "segment", "country"],
-    "KYCApplication": ["case_id", "product", "status"],
-    "Evidence": ["type", "verification_status", "lineage"],
-    "RiskFinding": ["category", "score", "severity"],
-    "Policy": ["policy_id", "version", "section"],
-    "Resolution": ["outcome", "rationale", "confidence"],
-    "Approval": ["reviewer", "decision", "timestamp"]
+  "version": "2.0",
+  "structural": {
+    "entities": {
+      "Customer": ["customer_id", "segment", "country"],
+      "KYCApplication": ["case_id", "product", "status"],
+      "Evidence": ["type", "verification_status", "lineage"],
+      "RiskFinding": ["category", "score", "severity"],
+      "Policy": ["policy_id", "version", "section"],
+      "Rule": ["rule_id", "version", "source"],
+      "Resolution": ["outcome", "rationale", "confidence"],
+      "Approval": ["reviewer", "decision", "timestamp"]
+    },
+    "relations": [
+      ["Customer", "SUBMITS", "KYCApplication"],
+      ["KYCApplication", "SUPPORTED_BY", "Evidence"],
+      ["KYCApplication", "HAS_FINDING", "RiskFinding"],
+      ["Rule", "IMPLEMENTS", "Policy"],
+      ["Rule", "DECIDES", "Resolution"],
+      ["Policy", "GOVERNS", "Resolution"],
+      ["Resolution", "REQUIRES", "Approval"]
+    ]
   },
-  "relations": [
-    ["Customer", "SUBMITS", "KYCApplication"],
-    ["KYCApplication", "SUPPORTED_BY", "Evidence"],
-    ["KYCApplication", "HAS_FINDING", "RiskFinding"],
-    ["Policy", "GOVERNS", "Resolution"],
-    ["Resolution", "REQUIRES", "Approval"]
-  ],
   "constraints": [
-    "sanctions_score >= 0.80 -> ESCALATE_COMPLIANCE, regardless of model proposal or case-note text",
-    "identity_mismatch or liveness_failed -> MANUAL_REVIEW",
-    "no_open_finding -> CLEAR, no automated action",
+    "hard_stop rules carry no action and must precede every non-hard-stop rule",
     "all write actions -> human approval + idempotency key",
-    "every resolution -> policy citation + evidence lineage + model attribution",
-    "case_note is untrusted free text -> never an input to policy evaluation, only planner context"
-  ]
+    "every resolution -> rule id@version + policy citation + evidence lineage + model attribution",
+    "case_note is untrusted free text -> never an input to rule evaluation, only planner context"
+  ],
+  "cognitive": {
+    "fact_sources": ["get_case", "verify_documents", "screen_sanctions", "get_risk_profile"],
+    "actions": ["request_document", "open_manual_review"],
+    "base_retrieval_tags": ["kyc", "risk_tier"],
+    "rules": [
+      {
+        "id": "R-AML-01",
+        "version": "1.0",
+        "status": "active",
+        "priority": 10,
+        "hard_stop": true,
+        "description": "A potential sanctions match at or above threshold always goes to Compliance; no automated contact or approval.",
+        "params": {"threshold": 0.80},
+        "when": {"all": [{"fact": "screen_sanctions.match_score", "op": ">=", "value": "@threshold"}]},
+        "then": {
+          "outcome": "ESCALATE_COMPLIANCE",
+          "action": null,
+          "risk_level": "CRITICAL",
+          "reason_key": "sanctions_hit",
+          "reason_params": {"score": "$screen_sanctions.match_score", "threshold": "@threshold"}
+        },
+        "cites": "AML-SCREEN-02",
+        "retrieval_tags": ["sanctions"],
+        "ontology_path": ["Customer", "KYCApplication", "RiskFinding"],
+        "source": {"kind": "policy", "ref": "AML-SCREEN-02 \u00a72.3"}
+      },
+      {
+        "id": "R-ID-01",
+        "version": "1.0",
+        "status": "active",
+        "priority": 30,
+        "hard_stop": false,
+        "description": "Conflicting legal name or failed liveness requires manual review.",
+        "params": {},
+        "when": {"any": [
+          {"fact": "verify_documents.name_match", "op": "is_false"},
+          {"fact": "verify_documents.liveness_passed", "op": "is_false"}
+        ]},
+        "then": {
+          "outcome": "MANUAL_REVIEW",
+          "action": "open_manual_review",
+          "risk_level": "HIGH",
+          "reason_key": "identity_conflict",
+          "reason_params": {}
+        },
+        "cites": "KYC-IDENTITY-11",
+        "retrieval_tags": ["identity_mismatch"],
+        "ontology_path": ["Customer", "KYCApplication", "Evidence"],
+        "source": {"kind": "policy", "ref": "KYC-IDENTITY-11 \u00a73.1"}
+      },
+      {
+        "id": "R-EVID-01",
+        "version": "1.0",
+        "status": "active",
+        "priority": 50,
+        "hard_stop": false,
+        "description": "Identity checks pass but required evidence is missing: request the missing documents.",
+        "params": {},
+        "when": {"all": [{"fact": "verify_documents.missing_fields", "op": "not_empty"}]},
+        "then": {
+          "outcome": "REQUEST_EVIDENCE",
+          "action": "request_document",
+          "risk_level": "$get_risk_profile.level",
+          "reason_key": "missing_evidence",
+          "reason_params": {"fields": "$verify_documents.missing_fields"}
+        },
+        "cites": "KYC-EVIDENCE-07",
+        "retrieval_tags": ["missing_evidence"],
+        "ontology_path": ["Customer", "KYCApplication", "Evidence"],
+        "source": {"kind": "policy", "ref": "KYC-EVIDENCE-07 \u00a74.2"}
+      },
+      {
+        "id": "R-CLEAR-01",
+        "version": "1.0",
+        "status": "active",
+        "priority": 1000,
+        "hard_stop": false,
+        "description": "Fallback: no open finding, close with no action and retain the evidence trail.",
+        "params": {},
+        "when": {"all": []},
+        "then": {
+          "outcome": "CLEAR",
+          "action": null,
+          "risk_level": "$get_risk_profile.level",
+          "reason_key": "clear",
+          "reason_params": {}
+        },
+        "cites": "KYC-CLEAR-01",
+        "retrieval_tags": ["clear"],
+        "ontology_path": ["Customer", "KYCApplication"],
+        "source": {"kind": "policy", "ref": "KYC-CLEAR-01 \u00a71.4"}
+      }
+    ]
+  }
 }

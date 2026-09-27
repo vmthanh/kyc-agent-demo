@@ -46,7 +46,11 @@ replaces the older `finalize_blocked`/`finalize_rejected` split.
 
 ## Control-plane principles
 
-- The planner proposes; `app/policy.py` decides. `policy_precheck` runs before
+- The planner proposes; `app/policy.py` decides by evaluating the executable
+  ontology (`app/ontology.py` over `data/ontology.json`). Rules are versioned
+  data in a closed language; hard-stop rules are evaluated first and cannot be
+  shadowed, and the verdict carries `rule_id@rule_version` plus the cited
+  policy, which `policy_precheck` requires retrieval to have surfaced. `policy_precheck` runs before
   the model, and `reconcile_guard` independently checks the structured
   proposal, fails closed on any planner/tool failure, and routes straight to
   `finalize` on a sanctions block -- there is no separate failure node. A
@@ -108,7 +112,8 @@ must enforce the same key with a durable unique constraint or compare-and-swap.
 ```text
 app/workflow/       state schema, fan-out/fan-in graph, nodes, and route functions
 app/planner.py      OpenRouter adapter and normal/compromised_demo prompt modes
-app/policy.py       pure deterministic policy precheck and guardrail
+app/policy.py       pure deterministic policy precheck and guardrail (façade over the ontology)
+app/ontology.py     validating ontology loader + closed-language rule interpreter
 app/tools.py        allowlisted reads, policy retrieval, and idempotent gateway
 app/agent.py        public run/resume/approve/reject façade over the graph
 app/checkpointing.py make_checkpointer(): Redis Stack -> in-memory fallback

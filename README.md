@@ -20,6 +20,12 @@ actively manipulated?**
 - `app/policy.py` independently recomputes the mandated outcome from the
   same typed facts -- never from the model's answer -- and overrides the
   proposal if they disagree. Every override is logged to the trace.
+- The decision logic is **data, not code**: versioned rules in
+  `data/ontology.json` (`cognitive.rules`) are interpreted by
+  `app/ontology.py` in a closed rule language. Every verdict names its rule
+  (`R-AML-01@1.0`) and cited policy, and the approval payload is bound to that
+  rule version. The loader rejects rules that read `case_note`, write actions
+  on hard-stop rules, and any rule that would shadow a hard stop.
 - One of the four synthetic cases (`KYC-1044`) carries a prompt-injection
   attempt in its free-text case note ("ignore the screening score..."). In
   `compromised_demo`, OpenRouter receives an explicitly compromised prompt;
@@ -64,7 +70,8 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 ```text
 app/
   domain.py      typed contracts: Outcome, ToolCall, PolicyCitation, LLMProposal, AgentDecision
-  policy.py      deterministic policy engine -- the safety boundary, pure functions
+  policy.py      deterministic policy façade -- the safety boundary, returns PolicyVerdict from the ontology
+  ontology.py    executable Cognitive Ontology: validating loader + closed-language rule interpreter
   planner.py     OpenRouter planner seam with normal / compromised_demo modes
   i18n.py        presentation-layer i18n: EN/VI templates + a best-effort LLM translation fallback
   tools.py       allowlisted read tools, versioned policy retrieval, idempotent action gateway
@@ -75,7 +82,7 @@ app/
   ui.py          optional rich demo: Streamlit over HTTP via KYCClient, native interrupt/resume UI
   cli.py         terminal demo
 data/
-  ontology.json  domain entities, relations, constraints
+  ontology.json  structural layer (entities, relations) + cognitive layer (versioned, executable rules)
   cases.json     4 synthetic cases: evidence gap, identity mismatch, sanctions hit (+ injected note), clean pass
   policies.json  versioned policy chunks with citations
 evals/
@@ -292,6 +299,13 @@ by content type:
 
 ## Design choices
 
+- **Rules are data.** Change a rule in `data/ontology.json` (or point
+  `KYC_ONTOLOGY_PATH` at an alternate file) and the next run uses it; the file
+  is re-read when its mtime changes. For example, raising `R-AML-01`'s
+  `params.threshold` to `0.95` turns KYC-1044 into `CLEAR` via `R-CLEAR-01`,
+  with no code change. `tests/test_ontology.py` holds the safety invariants
+  (the sanctions hard stop across a grid of inputs) and parity with the
+  original hand-coded branches.
 - **The guardrail is the product, not the model.** `policy.py` is pure,
   has no dependency on `planner.py` or `i18n.py`, and is exhaustively unit
   tested. Swapping the OpenRouter model or prompt mode never changes the

@@ -5,8 +5,8 @@ Baseline (2026-09-27): `uv run python -m unittest discover -s tests` → 139 tes
 
 | Task | Status | Commit | Tests after | Notes |
 |---|---|---|---|---|
-| 0 Housekeeping | ✅ done | see git log | 139 OK | `app.server` → `app.api` in interview guide; README Dana mapping stub |
-| 1 Executable ontology | ⏳ in progress | | | |
+| 0 Housekeeping | ✅ done | a04a09f | 139 OK | `app.server` → `app.api` in interview guide; README Dana mapping stub |
+| 1 Executable ontology | ✅ done | see git log | 163 OK, evals 19/19 | rules are data; see `task-1-report.md` |
 | 2 Expert rule | ⬜ todo | | | |
 | 3 Dana vocabulary | ⬜ todo | | | |
 | 4 RAG baseline compare | ⬜ todo | | | |
