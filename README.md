@@ -105,6 +105,9 @@ slides/
 
 ## Run the primary demo (recommended for the interview)
 
+> Step-by-step demo commands, CLI fallbacks, and on-stage troubleshooting:
+> `docs/DEMO_RUNBOOK.md`.
+
 One local process is enough for the HTTP demo. Live `normal` and
 `compromised_demo` runs require network access and `OPENROUTER_API_KEY`; the
 opt-in smoke command checks that provider connection.
