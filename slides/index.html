@@ -195,6 +195,29 @@ pre.code .k{color:#9FE0B8} pre.code .v{color:#C8FF62} pre.code .c{color:#7E9188}
 .step.dark .m{background:#1E352B;color:var(--lime)}
 td .m{display:block;font-size:12.5px;font-weight:400;color:var(--gray);margin-top:3px}
 
+
+/* memory slides */
+.tl{display:flex;align-items:center;margin-top:30px}
+.tl .nd{background:var(--panel);padding:12px 10px;text-align:center;font:700 13px "SF Mono",ui-monospace,Menlo,monospace;min-width:118px}
+.tl .nd span{display:block;font:12px Arial,sans-serif;color:var(--gray);margin-top:4px}
+.tl .nd.stop{background:var(--alert-bg);outline:2px solid var(--alert)}
+.tl .nd.go{background:var(--lime)}
+.tl .ar{width:26px;text-align:center;color:var(--green);font-size:20px}
+.tl .gap{flex:1;margin:0 10px;border-top:3px dashed var(--alert);position:relative;text-align:center;min-width:120px}
+.tl .gap span{position:relative;top:-14px;background:#fff;padding:0 8px;font-size:14px;font-weight:700;color:var(--alert)}
+.saves{display:flex;align-items:center;gap:10px;margin-top:10px;background:#0F1F18;color:#D3DED7;padding:10px 16px;font-size:14px}
+.saves b{color:var(--lime)} .saves .d{margin-left:auto;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px;color:#9FE0B8}
+table.mem{width:100%;border-collapse:collapse;margin-top:20px;table-layout:fixed}
+table.mem th{background:var(--ink);color:#fff;font-size:15px;text-align:left;padding:10px 14px}
+table.mem td{font-size:15px;padding:7px 14px;border-bottom:1px solid var(--hair);line-height:1.3;vertical-align:middle}
+table.mem td:first-child{font-weight:700}
+table.mem td .m{display:block;font-size:12.5px;color:var(--gray);font-weight:400;margin-top:2px}
+.yes{color:var(--green);font-weight:700} .no{color:var(--alert);font-weight:700} .mid{color:var(--amber);font-weight:700}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.mode{padding:8px 14px;font-size:14px;line-height:1.35;background:var(--panel)}
+.mode code{font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:700}
+.mode.warn{background:var(--amber-bg)}
+
 /* notes / controls */
 .notes{display:none}
 #notespane{position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow:auto;
@@ -354,6 +377,85 @@ body.capture #hud,body.capture #progress,body.capture #notespane{display:none!im
     operational_review use LangGraph interrupt(). The grounding and action nodes retry transient tool errors, then
     fail closed. validate_submission can also loop back to await_documents (retry) or give up to
     operational_review. Print the live graph with KYC_PRINT_GRAPH=1.
+  </aside>
+</section>
+
+
+<!-- MEMORY 1 -->
+<section class="slide">
+  <div class="kicker">How it works · memory (1/2)</div>
+  <h1>A case can pause for hours, then continue where it stopped</h1>
+  <div class="tl">
+    <div class="nd">intake<span>start</span></div><div class="ar">→</div>
+    <div class="nd">4 checks<span>facts</span></div><div class="ar">→</div>
+    <div class="nd">reconcile_guard<span>rules decide</span></div><div class="ar">→</div>
+    <div class="nd stop">action_review<span>⏸ interrupt()</span></div>
+    <div class="gap"><span>waits for a person</span></div>
+    <div class="nd go">action_review<span>▶ resumed</span></div><div class="ar">→</div>
+    <div class="nd">execute_action<span>one ticket</span></div><div class="ar">→</div>
+    <div class="nd">finalize<span>end</span></div>
+  </div>
+  <div class="saves">💾 <b>Checkpointer</b> saves the full workflow state after <b>every</b> step · same key before and after the pause
+    <span class="d">thread_id = "KYC-1046:7f3a…"</span></div>
+  <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:22px;margin-top:22px">
+    <pre class="code"><span class="c"># app/agent.py (simplified)</span>
+config = {<span class="k">"configurable"</span>: {<span class="k">"thread_id"</span>: <span class="v">f"{case_id}:{uuid4()}"</span>}}
+
+<span class="c"># POST /api/run → runs until interrupt(), state saved</span>
+graph.invoke(initial_state(case_id, ...), config)
+
+<span class="c"># POST /api/approve → same config = same thread</span>
+graph.invoke(Command(resume={<span class="k">"approved"</span>: True,
+                             <span class="k">"approver"</span>: <span class="v">"lan.pham"</span>}), config)</pre>
+    <div class="col done" style="padding:18px 24px"><div class="kicker">What one checkpoint holds</div>
+      <ul style="margin-top:6px">
+        <li><b>Facts</b> from the 4 checks + policy citations</li>
+        <li><b>AI proposal</b> and the <b>rule decision</b></li>
+        <li><b>Answers already given</b> at a pause<span>e.g. approval 1 of 2, replayed in order on resume</span></li>
+        <li><b>Trace</b> and tool calls<span>append-only lists: they only grow</span></li>
+      </ul></div>
+  </div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">This is workflow memory, not chat memory <b>·</b> every run starts on a fresh thread; the AI never “remembers” past cases</div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="app/agent.py (run, resume) · app/workflow/state.py (WorkflowState) · app/checkpointing.py">
+    The graph is compiled with a checkpointer. LangGraph writes a checkpoint of WorkflowState after each super-step,
+    keyed by thread_id. interrupt() stops the run and returns the pending task to the API; approve/reject/resume
+    call graph.invoke(Command(resume=...)) with the same config, so LangGraph reloads the last checkpoint and
+    re-runs action_review from its start: earlier interrupt() calls get their saved answers back in order, and the new answer goes to the next interrupt(). That is how the two-person approval rebuilds "1 of 2" deterministically. Consequence: code before interrupt() must be side-effect free, which is why the write happens in execute_action.
+    trace, tool_calls and tool_errors use an operator.add reducer, so they only ever grow. A new uuid per run means
+    no state leaks between cases or into the model's prompt.
+  </aside>
+</section>
+
+<!-- MEMORY 2 -->
+<section class="slide">
+  <div class="kicker">How it works · memory (2/2)</div>
+  <h1>Where memory lives, and what survives a restart</h1>
+  <table class="mem">
+    <colgroup><col style="width:22%"><col style="width:33%"><col style="width:15%"><col style="width:30%"></colgroup>
+    <thead><tr><th>What</th><th>Where today</th><th>Survives restart?</th><th>Production path</th></tr></thead>
+    <tbody>
+      <tr><td>Workflow state</td><td>LangGraph checkpointer<span class="m">MemorySaver, or RedisSaver if REDIS_URL is set</span></td><td class="mid">Only with Redis</td><td>Redis / Postgres saver, TTL + backups</td></tr>
+      <tr><td>Paused-approval handles</td><td>Python dict in the agent<span class="m">agent._pending_tasks</span></td><td class="no">No</td><td>Store by interrupt id in a database</td></tr>
+      <tr><td>Duplicate-ticket log</td><td>Python dict in the tools<span class="m">tools.action_log, keyed by sha256</span></td><td class="no">No</td><td>Unique constraint in the ticket system</td></tr>
+      <tr><td>Reviewer signals, drafts, last decision</td><td>Python dicts<span class="m">ReflectStore.signals / amendments · agent._results</span></td><td class="no">No</td><td>Database table (cache is fine to lose)</td></tr>
+      <tr><td>Promoted rules &amp; audit log</td><td>Files<span class="m">.runtime/ontology/ + append-only log</span></td><td class="yes">Yes</td><td>Versioned store, immutable audit</td></tr>
+      <tr><td>Step-by-step traces</td><td>MLflow (optional)<span class="m">for debugging, not for resuming</span></td><td class="yes">Yes, if server runs</td><td>Observability platform</td></tr>
+    </tbody>
+  </table>
+  <div class="modes">
+    <div class="mode"><code>REDIS_URL</code> unset → <b>memory</b><br>default for demo and tests</div>
+    <div class="mode"><code>REDIS_URL</code> works → <b>redis</b><br>needs Redis Stack (RediSearch)</div>
+    <div class="mode warn"><code>REDIS_URL</code> broken → <b>memory (degraded)</b><br>loud warning; <code>GET /health</code> shows it</div>
+  </div>
+  <div class="foot" style="bottom:48px;font-size:19px;padding:14px 24px">Redis makes the workflow durable <b>·</b> the approval handles are not yet, so this runs as one server today</div>
+  <div class="pagenum"></div>
+  <aside class="notes" data-src="app/checkpointing.py · app/agent.py · app/tools.py · app/reflect.py · app/api.py (/health)">
+    Be precise when asked "is it durable?": the graph state is, with Redis; the handle the API uses to find a paused
+    run (graph object + config) is in process memory, and so is the idempotency log. After a restart Redis still has
+    the checkpoint, but the API no longer knows the approval key. Fix: persist pending tasks (interrupt id → thread_id,
+    case, required approvals) and the idempotency log in a database, then any replica can resume any thread.
+    A broken REDIS_URL degrades loudly instead of failing silently; credentials are never logged.
   </aside>
 </section>
 

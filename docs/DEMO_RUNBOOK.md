@@ -8,7 +8,7 @@ Copy-paste commands for running the demo live. For talking points and timing, se
 
 ## Presentation files
 
-- Main 14-slide deck (plain headlines + technical "under the hood" detail): open `slides/index.html` in a browser (`N` toggles speaker notes).
+- Main 16-slide deck (plain headlines + technical "under the hood" detail): open `slides/index.html` in a browser (`N` toggles speaker notes).
 - Concise 9-slide technical deck: `slides/index-concise.html`.
 - PowerPoint (generated locally, gitignored): `uv run --with python-pptx python slides/to_pptx.py`.
 - Narrative/timing: `docs/INTERVIEW_GUIDE.md`. Technical detail lives in the concise deck and speaker notes.

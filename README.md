@@ -101,7 +101,7 @@ tests/
 docs/
   INTERVIEW_GUIDE.md, ARCHITECTURE.md, PRODUCTION_ROADMAP.md, ROUNDS_2_AND_3.md
 slides/
-  index.html     the interview deck: 14 HTML slides, speaker notes, print/export modes
+  index.html     the interview deck: 16 HTML slides, speaker notes, print/export modes
   to_pptx.py     renders index.html to slides/deck.pptx (Chrome + python-pptx)
 ```
 
@@ -158,9 +158,9 @@ uv run python -m app.cli --case KYC-1044 --planner compromised_demo
 
 ## Present the deck
 
-`slides/index.html` is the source of truth for the 14-slide presentation (plain headlines, with an "under the hood" layer) -- open it in
+`slides/index.html` is the source of truth for the 16-slide presentation (plain headlines, with an "under the hood" layer) -- open it in
 any browser and present from it directly. Narrative order: problem → the idea in one
-picture → front end/back end/agent → LangGraph node map → chatbot vs agent → rulebook → three demos (sanctions, blurry name,
+picture → front end/back end/agent → LangGraph node map → memory (checkpointer, Redis, what survives a restart) → chatbot vs agent → rulebook → three demos (sanctions, blurry name,
 two-person approval) → results → learning from reviewers → honest status.
 Each slide keeps a plain headline and adds the real code facts (nodes, routes, rule JSON, payloads). Keys: `←`/`→` navigate, `N` speaker notes, `E` export view
 (all slides stacked, print-ready), `F` fullscreen.
