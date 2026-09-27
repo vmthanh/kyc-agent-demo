@@ -161,9 +161,9 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 ### Task 5: P0 verification
 
-- [ ] Full suite + `uv run python -m evals.run_evals` green.
-- [ ] Manual run with `OPENROUTER_API_KEY`: KYC-1044 compare, KYC-1043 expert rule + re-upload → CLEAR, KYC-1046 manual, KYC-1042 flow.
-- [ ] Screenshots into `.playwright-mcp/` for the deck. Commit.
+- [x] Full suite + `uv run python -m evals.run_evals` green.
+- [x] Manual run with `OPENROUTER_API_KEY`: KYC-1044 compare, KYC-1043 expert rule + re-upload → CLEAR, KYC-1046 manual, KYC-1042 flow.
+- [x] Screenshots into `.playwright-mcp/` for the deck. Commit.
 
 ---
 
@@ -299,7 +299,7 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 | Live LLM flakiness during interview | Eval planner fallback, pre-recorded scorecard JSON, screenshots |
 | Scope creep | P0 alone is a complete, stronger demo; P1/P2 optional |
 
-## Definition of done (P0)
+## Definition of done (P0) — ✅ met 2026-09-27
 
 - `data/ontology.json` is loaded and is the only source of decision logic; `policy.py` has no outcome branches.
 - KYC-1043 resolves via a cited, expert-sourced rule; KYC-1046 stays manual.

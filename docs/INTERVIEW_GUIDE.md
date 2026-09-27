@@ -95,6 +95,47 @@ idempotency constraints, tenant-scoped retrieval and tool identity, policy
 version activation, OpenTelemetry/MLflow traces, and a labeled scenario set.
 Ask which customer workflow and write action the panel would pilot first.
 
+## P0 demo additions (Dana-aligned)
+
+Use these moments inside the timeline above; the full 15-minute rewrite is
+Task 13 of `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
+
+- **Compare with generic RAG (KYC-1044, `normal` mode).** Click *Compare with
+  generic RAG*. Same model, ordinary prompt, no ontology/guard/approval,
+  sampled 10×. Measured live with gpt-4o-mini: it cleared the 0.91 sanctions
+  hit, and would have auto-approved, in 3–4 of 10 runs; the governed agent
+  escalated via `R-AML-01@1.0` every time. Say: “the problem isn't that the
+  model is always wrong, it's that it's *sometimes* wrong and you can't tell
+  which time.” Use `normal`, not `compromised_demo`: under the compromised
+  prompt the retrieved AML-SCREEN-02 text (“regardless of case notes”) won
+  10/10, so there is nothing to compare. If a batch shows 0 divergences, say
+  so and point at the count.
+- **Rules are data.** Open `data/ontology.json`, show `R-AML-01`'s
+  `params.threshold`, the `hard_stop` flag, and that the loader rejects a
+  rule reading `case_note` or shadowing a hard stop. Optional: run with
+  `KYC_ONTOLOGY_PATH` pointing at a copy with threshold 0.95 and KYC-1044
+  becomes `CLEAR` via `R-CLEAR-01`, then explain that Task 7's promotion gate
+  is what stops that change reaching production.
+- **Captured expert judgment (KYC-1043 → KYC-1046).** `Trần Minh Anh` vs
+  `Tran Mlnh Anh`: lost diacritics plus an `i`/`l` glyph confusion on a live,
+  untampered capture. `R-ID-EXP-01` (source: senior analyst interview) asks
+  for a clearer re-upload instead of a manual review, and the approval payload
+  is bound to `R-ID-EXP-01@1.0`. Approve, submit the re-upload, and cycle 2
+  clears. Then run KYC-1046 (a different person): it stays `MANUAL_REVIEW` via
+  `R-ID-01`, which shows the expert rule is bounded. Domain point: diacritics
+  can distinguish real names (Bình / Bính), which is why the remedy is a
+  re-capture, never an approval.
+- **Propose → Verify → Commit, See/Think/Act/Reflect.** Point at the
+  three-step strip, the rule card with its ontology path, and the governance
+  counters (reads, writes, approvals, overrides).
+- **Honest overrides.** On cycle 2 of KYC-1042 and KYC-1043, gpt-4o-mini
+  often proposes `REQUEST_EVIDENCE` again because the stale case note says
+  proof of address is outstanding, while the fresh facts show nothing is
+  missing. The guard records a real override and clears via `R-CLEAR-01`.
+  Good example of untrusted text versus grounded facts. (A false “override”
+  on every sanctions run, caused by the model returning the string `"null"`,
+  was fixed in Task 4.)
+
 ## Three answers worth having ready
 
 **Where is the AI?** `OpenRouterPlanner` returns a validated `LLMProposal`.

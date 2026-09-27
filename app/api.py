@@ -106,6 +106,11 @@ def _enable_mlflow_autologging() -> None:
     if not tracking_uri:
         logger.info("MLflow tracing disabled; set MLFLOW_TRACKING_URI to enable it")
         return
+    if tracking_uri.startswith(("http://", "https://")) and not _tracking_server_reachable(tracking_uri):
+        # mlflow.set_experiment() retries for minutes against a dead server and
+        # blocks startup; tracing is best-effort, so skip it loudly instead.
+        logger.warning("MLflow tracing disabled: tracking server %s is not reachable", tracking_uri)
+        return
     try:
         import mlflow
 
@@ -114,6 +119,16 @@ def _enable_mlflow_autologging() -> None:
         mlflow.langchain.autolog()
     except Exception as exc:  # best-effort tracing must not stop the runtime
         logger.warning("MLflow tracing disabled: %s", exc)
+
+
+def _tracking_server_reachable(uri: str, timeout: float = 1.5) -> bool:
+    import httpx
+
+    try:
+        httpx.get(uri, timeout=timeout)
+        return True
+    except httpx.HTTPError:
+        return False
 
 
 @asynccontextmanager
