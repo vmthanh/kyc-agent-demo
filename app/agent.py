@@ -165,6 +165,8 @@ class KYCExceptionAgent:
             planner_attempts=result.get("planner_attempts", 0), planner_usage=proposal.usage if proposal else {},
             planner_mode=result.get("planner_mode", "normal"), rule=rule_view,
             governance=governance,
+            proposal_outcome=proposal.outcome if proposal else None,
+            proposal_action=proposal.action if proposal else None,
         )
 
     @staticmethod

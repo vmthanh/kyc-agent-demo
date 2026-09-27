@@ -31,8 +31,9 @@ def action_idempotency_key(action_payload: dict[str, Any]) -> str:
 class DomainTools:
     """Typed adapters. In production these wrap customer APIs and policy services."""
 
-    def __init__(self) -> None:
-        self.cases = self._load("cases.json")
+    def __init__(self, cases_path: str | Path | None = None) -> None:
+        # `cases_path` lets evals point the same adapters at the labelled golden set.
+        self.cases = json.loads(Path(cases_path).read_text()) if cases_path else self._load("cases.json")
         self.policies = self._load("policies.json")
         self.action_log: dict[str, dict[str, Any]] = {}
         self._action_lock = threading.Lock()

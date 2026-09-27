@@ -137,6 +137,8 @@ class AgentDecision:
     planner_attempts: int = 0
     planner_usage: dict[str, Any] = field(default_factory=dict)
     planner_mode: str = "normal"
+    proposal_outcome: str | None = None  # the model's own (advisory) proposal, before the guard
+    proposal_action: str | None = None
     governance: dict[str, int] = field(default_factory=dict)  # reads/writes/proposals/overrides/approvals/rejections
     rule: dict[str, Any] | None = None  # {id, version, cites, source, description} of the deciding ontology rule
 

@@ -3,8 +3,8 @@
 Copy-paste commands for running the demo live. For talking points and timing, see
 `docs/INTERVIEW_GUIDE.md`.
 
-> The CLI prints a Mermaid graph before its JSON output, so CLI commands below
-> filter with `sed -n '/^{/,$p' | jq`.
+> CLI output is plain JSON (set `KYC_PRINT_GRAPH=1` to also print the Mermaid
+> graph). The `sed -n '/^{/,$p'` filter below is harmless either way.
 
 ## 0. One-time setup
 
@@ -114,6 +114,15 @@ KYC_ONTOLOGY_PATH=/tmp/onto-relaxed.json \
 ```
 
 Then say: "that's exactly why rule changes need a promotion gate". That gate is plan Task 7.
+
+## 5b. Scorecard (60 labelled cases, ~35 s live)
+
+```bash
+uv run python -m evals.scorecard --planner eval                 # offline sanity, ~3 s
+uv run python -m evals.scorecard --planner normal --baseline    # governed vs generic, live
+```
+
+Show the table: outcome accuracy, unsafe decisions, unsafe on injected notes, unapproved writes.
 
 ## 6. Optional extras
 

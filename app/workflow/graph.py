@@ -12,6 +12,7 @@ node now fails closed on its own) and the three finalize variants into one
 node keyed by a `final_outcome` field.
 """
 from dataclasses import dataclass, field
+import os
 import time
 from typing import Any
 
@@ -146,12 +147,14 @@ def build_workflow_graph(
     builder.add_edge("operational_review", "finalize")
     builder.add_edge("finalize", END)
     graph = builder.compile(checkpointer=checkpointer or MemorySaver())
-    _print_graph_mermaid(graph)
+    if os.getenv("KYC_PRINT_GRAPH") == "1":
+        print(graph_mermaid(graph))
     return graph
 
 
-def _print_graph_mermaid(graph) -> None:
-    """Print the compiled graph as mermaid syntax (paste into mermaid.live or an editor preview).
+def graph_mermaid(graph) -> str:
+    """The compiled graph as mermaid syntax (paste into mermaid.live or an editor preview).
+    Printed on build only when KYC_PRINT_GRAPH=1, so CLI/eval output stays clean JSON.
 
     Error-handler nodes are only reachable via runtime Command(goto=...), so they
     have no static edges. Left in, they'd show up as disconnected floating boxes,
@@ -162,4 +165,4 @@ def _print_graph_mermaid(graph) -> None:
     for node_id in list(g.nodes):
         if node_id not in connected_ids:
             g.remove_node(g.nodes[node_id])
-    print(g.draw_mermaid())
+    return g.draw_mermaid()
