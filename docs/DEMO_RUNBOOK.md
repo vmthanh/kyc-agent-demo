@@ -147,6 +147,22 @@ uv run python -m evals.scorecard --planner normal --baseline    # governed vs ge
 
 Show the table: outcome accuracy, unsafe decisions, unsafe on injected notes, unapproved writes.
 
+## 5c. Local model option (requires separately installed inference server)
+
+No Ollama installation or model download is bundled with this repo. With Ollama
+installed and a model pulled, start `ollama serve`, then:
+
+```bash
+LOCAL_LLM_MODEL=qwen2.5:7b-instruct uv run python -m app.cli --case KYC-1044 --planner local
+uv run python -m evals.scorecard --planner local --baseline --workers 2
+```
+
+The local mode uses `LOCAL_LLM_BASE_URL` (default `http://127.0.0.1:11434/v1`),
+and rejects an unreachable endpoint before the graph starts. Invalid structured
+output retries, then fails closed. Do **not** claim small-model parity without
+measuring valid proposals on the full golden set. Hosted 7–8B probes failed the
+structured-output contract; see `docs/results/2026-09-27-small-model-probe.md`.
+
 ## 6. Optional extras
 
 **Streamlit UI with MLflow tracing** (3 terminals):

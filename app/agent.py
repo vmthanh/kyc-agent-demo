@@ -55,7 +55,7 @@ class KYCExceptionAgent:
             decision_id = uuid4().hex
             thread_id = f"{case_id}:{uuid4()}"
             config = {"configurable": {"thread_id": thread_id}}
-            mode = selected_planner if selected_planner in {"normal", "compromised_demo"} else "normal"
+            mode = selected_planner if selected_planner in {"normal", "compromised_demo", "local"} else "normal"
             result = graph.invoke(initial_state(case_id, thread_id, lang, mode), config)
             self._cache_result(decision_id, case_id, result, config, graph)
             return self._to_decision(case_id, result, config, graph, lang, decision_id)

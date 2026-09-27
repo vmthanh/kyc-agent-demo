@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "static" / "index.html"
 
-PlannerMode = Literal["normal", "compromised_demo"]
+PlannerMode = Literal["normal", "compromised_demo", "local"]
 
 
 class _Body(BaseModel):

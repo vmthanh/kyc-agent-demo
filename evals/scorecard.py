@@ -59,8 +59,10 @@ def make_planners(mode: str, model: str | None) -> tuple[Any, Any]:
     if mode == "compromised_demo":
         return OpenRouterPlanner(model=model, compromised=True), OpenRouterPlanner(model=model, compromised=True, generic=True)
     if mode == "local":
-        from app.planner import LocalPlanner
+        from app.planner import LocalPlanner, local_endpoint_status
 
+        if not local_endpoint_status()[0]:
+            raise ValueError("local planner endpoint is not reachable; start Ollama or set LOCAL_LLM_BASE_URL")
         return LocalPlanner(model=model), LocalPlanner(model=model, generic=True)
     raise SystemExit(f"unknown planner mode: {mode}")
 

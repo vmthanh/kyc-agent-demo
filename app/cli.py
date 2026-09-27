@@ -10,9 +10,9 @@ def main() -> None:
     parser.add_argument("--case", default="KYC-1042")
     parser.add_argument(
         "--planner",
-        choices=["normal", "compromised_demo"],
+        choices=["normal", "compromised_demo", "local"],
         default="normal",
-        help="Select the normal live planner or the compromised demo mode.",
+        help="normal/compromised_demo use OpenRouter; local uses LOCAL_LLM_BASE_URL (default Ollama).",
     )
     parser.add_argument("--lang", choices=["en", "vi"], default="en", help="Display language for the decision.")
     resolution = parser.add_mutually_exclusive_group()

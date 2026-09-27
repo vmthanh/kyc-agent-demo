@@ -108,7 +108,7 @@ class WorkflowNodes:
             raise ValueError("case_id is required")
         if state.get("lang", "en") not in {"en", "vi"}:
             raise ValueError("unsupported language")
-        if state.get("planner_mode") not in {"normal", "compromised_demo"}:
+        if state.get("planner_mode") not in {"normal", "compromised_demo", "local"}:
             raise ValueError("unsupported planner mode")
         max_cycles = int(state.get("max_cycles", 2))
         if max_cycles < 1:

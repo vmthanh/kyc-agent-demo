@@ -219,12 +219,11 @@ Encode a senior VN KYC reviewer heuristic for KYC-1043 (`Tran Minh Anh` vs `Tran
 
 **Files:** `app/planner.py`, `.env.example`, `README.md`, `tests/test_workflow_planner.py`
 
-- [ ] Add `planner_mode="local"`: `ChatOpenAI` against an OpenAI-compatible local endpoint (`LOCAL_LLM_BASE_URL`, default
+- [x] Add `planner_mode="local"`: `ChatOpenAI` against an OpenAI-compatible local endpoint (`LOCAL_LLM_BASE_URL`, default
       Ollama `http://127.0.0.1:11434/v1`, `LOCAL_LLM_MODEL` e.g. `qwen2.5:7b-instruct`). Same structured output + failure semantics.
-- [ ] Mocked-transport test mirroring the OpenRouter adapter test; missing endpoint → configuration error before graph runs.
-- [ ] Run scorecard for `normal` vs `local`, with and without `--baseline`; save the table for the deck
-      ("7B + ontology ≈ large model; 7B alone unsafe"). Report honestly whatever the numbers are.
-- [ ] Commit: `feat: local small-model planner for sovereign deployment`.
+- [x] Mocked-transport test mirroring the OpenRouter adapter test; missing endpoint → configuration error before graph runs.
+- [ ] Run the full scorecard for `normal` vs **local** with and without `--baseline` after a local server/model is installed; save measured results for the deck. Do not claim 7B parity without valid proposals. Hosted 7–8B probes (10 cases each) failed structured output; see `docs/results/2026-09-27-small-model-probe.md`. No local model was installed without explicit user confirmation.
+- [x] Commit: `feat: local small-model planner for sovereign deployment`.
 
 ---
 

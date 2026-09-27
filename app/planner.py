@@ -21,6 +21,20 @@ from .policy import evaluate
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
 
+VALID_OUTCOMES = {"CLEAR", "REQUEST_EVIDENCE", "MANUAL_REVIEW", "ESCALATE_COMPLIANCE"}
+VALID_ACTIONS = {None, "request_document", "open_manual_review"}
+
+
+def _check_schema(outcome: str, action: str | None) -> None:
+    """Small models often return free text ("PENDING", "Request proof of address")
+    in enum fields. That is a malformed proposal, not an opinion: raise so the
+    graph's bounded retry runs, then fails closed to the strict safe route."""
+    if outcome not in VALID_OUTCOMES:
+        raise PlannerUnavailableError("InvalidOutcome")
+    if action not in VALID_ACTIONS:
+        raise PlannerUnavailableError("InvalidAction")
+
+
 def _normalize_action(action: str | None) -> str | None:
     """Models often spell "no action" as the string "null"/"none". Without this,
     the guard would compare "null" to None and report an override that did not
@@ -99,6 +113,10 @@ class OpenRouterPlanner:
 
     generic = False  # class default: instances built without __init__ keep the governed prompt
 
+    base_url = "https://openrouter.ai/api/v1"
+    provider = "openrouter"
+    request_timeout = 20
+
     def __init__(self, model: str | None = None, compromised: bool = False, generic: bool = False) -> None:
         from langchain_openai import ChatOpenAI
         from pydantic import BaseModel, Field
@@ -115,21 +133,27 @@ class OpenRouterPlanner:
             confidence: float = Field(ge=0, le=1)
 
         self._schema = Proposal
-        self.model = model or os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
-        self.name = f"openrouter:{self.model}"
+        self.model = model or self._default_model()
+        self.name = f"{self.provider}:{self.model}"
         self.compromised = compromised
         # `generic` = the plain LLM + RAG baseline used by /api/compare: an
         # ordinary assistant prompt, the case note presented as normal case
         # context, and no mention of a guardrail. Never used by the governed graph.
         self.generic = generic
         client = ChatOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=os.environ["OPENROUTER_API_KEY"],
+            base_url=self.base_url,
+            api_key=self._api_key(),
             model=self.model,
             temperature=0,
-            timeout=20,
+            timeout=self.request_timeout,
         )
         self._structured_client = client.with_structured_output(Proposal, include_raw=True)
+
+    def _default_model(self) -> str:
+        return os.getenv("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
+
+    def _api_key(self) -> str:
+        return os.environ["OPENROUTER_API_KEY"]
 
     def propose(self, case_id, facts, citations, case_note) -> LLMProposal:
         if self.compromised:
@@ -174,14 +198,54 @@ class OpenRouterPlanner:
                 response_usage = (getattr(raw, "response_metadata", None) or {}).get("usage", {})
                 if response_usage.get("cost") is not None:
                     usage["cost"] = response_usage["cost"]
+            outcome = str(parsed.outcome).strip().upper()
+            action = _normalize_action(parsed.action)
+            _check_schema(outcome, action)
             return LLMProposal(
-                parsed.outcome, _normalize_action(parsed.action), parsed.rationale,
+                outcome, action, parsed.rationale,
                 float(parsed.confidence), self.name, usage=usage,
             )
         except PlannerUnavailableError:
             raise
         except Exception as exc:
             raise PlannerUnavailableError(type(exc).__name__) from exc
+
+
+DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1"  # Ollama's OpenAI-compatible endpoint
+DEFAULT_LOCAL_MODEL = "qwen2.5:7b-instruct"
+
+
+class LocalPlanner(OpenRouterPlanner):
+    """Same planner contract against a local OpenAI-compatible server (Ollama,
+    LM Studio, vLLM, llama.cpp): the sovereign / air-gapped deployment option.
+    Same structured output, same failure semantics, same deterministic guard."""
+
+    provider = "local"
+    request_timeout = 120  # CPU/GPU-local 7B models are slower than a hosted API
+
+    def __init__(self, model: str | None = None, compromised: bool = False, generic: bool = False,
+                 base_url: str | None = None) -> None:
+        self.base_url = (base_url or os.getenv("LOCAL_LLM_BASE_URL") or DEFAULT_LOCAL_BASE_URL).rstrip("/")
+        super().__init__(model=model, compromised=compromised, generic=generic)
+
+    def _default_model(self) -> str:
+        return os.getenv("LOCAL_LLM_MODEL") or DEFAULT_LOCAL_MODEL
+
+    def _api_key(self) -> str:
+        return os.getenv("LOCAL_LLM_API_KEY", "local")  # local servers ignore the key but the client requires one
+
+
+def local_endpoint_status(base_url: str | None = None, timeout: float = 2.0) -> tuple[bool, list[str]]:
+    """(reachable, model ids) for the configured local endpoint."""
+    import httpx
+
+    url = (base_url or os.getenv("LOCAL_LLM_BASE_URL") or DEFAULT_LOCAL_BASE_URL).rstrip("/") + "/models"
+    try:
+        response = httpx.get(url, timeout=timeout)
+        response.raise_for_status()
+        return True, [m.get("id", "") for m in response.json().get("data", [])]
+    except (httpx.HTTPError, ValueError):
+        return False, []
 
 
 def select_planner(mode: str | None = None) -> Planner:
@@ -195,6 +259,15 @@ def select_planner(mode: str | None = None) -> Planner:
         return AdversarialPlanner()
     if choice == "heuristic":
         return HeuristicPlanner()
+    if choice == "local":
+        reachable, _ = local_endpoint_status()
+        if not reachable:
+            raise ValueError(
+                "local planner endpoint is not reachable at "
+                f"{os.getenv('LOCAL_LLM_BASE_URL') or DEFAULT_LOCAL_BASE_URL}; start Ollama "
+                "(`ollama serve`) or set LOCAL_LLM_BASE_URL"
+            )
+        return LocalPlanner()
     if choice not in {"normal", "compromised_demo"}:
         raise ValueError(f"Unknown planner mode: {choice}")
     key = os.getenv("OPENROUTER_API_KEY", "").strip()

@@ -74,6 +74,12 @@ def select_baseline_planner(mode: str | None) -> Planner:
         key = os.getenv("OPENROUTER_API_KEY", "").strip()
         if not key or key == "your_key_here":
             raise ValueError("OPENROUTER_API_KEY is required for live planner modes")
+    if choice == "local":
+        from .planner import LocalPlanner, local_endpoint_status
+
+        if not local_endpoint_status()[0]:
+            raise ValueError("local planner endpoint is not reachable; start Ollama or set LOCAL_LLM_BASE_URL")
+        return LocalPlanner(generic=True)
     if choice == "compromised_demo":
         return OpenRouterPlanner(compromised=True, generic=True)
     if choice == "normal":

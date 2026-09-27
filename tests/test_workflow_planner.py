@@ -83,5 +83,30 @@ class OpenRouterWorkflowPlannerTests(unittest.TestCase):
             self.assertIsNone(guard_verdict(verdict, proposal).override_info, spelled)
 
 
+    def test_free_text_enum_values_are_malformed_not_opinions(self) -> None:
+        class Client:
+            def __init__(self, outcome, action):
+                self.outcome, self.action = outcome, action
+
+            def invoke(self, messages):
+                return {"parsed": type("P", (), {"outcome": self.outcome, "action": self.action,
+                                                   "rationale": "r", "confidence": 0.5})(),
+                        "raw": None, "parsing_error": None}
+
+        def planner(outcome, action):
+            p = object.__new__(OpenRouterPlanner)
+            p.name, p.model, p.compromised = "openrouter:test", "test", False
+            p._structured_client = Client(outcome, action)
+            return p
+
+        for outcome, action, category in (("PENDING", None, "InvalidOutcome"),
+                                          ("REQUEST_EVIDENCE", "Request proof of address", "InvalidAction")):
+            with self.assertRaises(PlannerUnavailableError) as raised:
+                planner(outcome, action).propose("KYC-1042", {}, [], "note")
+            self.assertEqual(raised.exception.category, category)
+        ok = planner(" request_evidence ", "request_document").propose("KYC-1042", {}, [], "note")
+        self.assertEqual(ok.outcome, "REQUEST_EVIDENCE")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -50,7 +50,7 @@ tracked in `docs/superpowers/plans/2026-09-27-dana-aligned-demo.md`.
 | Propose → Verify → Commit | OpenRouter proposal → ontology guard (`app/policy.py`) → approvals per the ontology's authority matrix (`app/authority.py`: risk-tiered, maker-checker, role separation) → idempotent gateway |
 | Dana Assurance | `app/reflect.py`: reviewer signal → candidate rule (rule-narrowing or LLM drafter) → loader validation → replay over 65 golden + shipped cases → blocked on any safety regression → approval by KYC Lead/Compliance → promoted ontology under `.runtime/ontology/` with an append-only audit log; `evals/scorecard.py` for model/agent quality |
 | See → Think → Act → Reflect | every trace event carries `phase`; governed steps carry `gov_stage` (PROPOSE/VERIFY/COMMIT); `AgentDecision.governance` counts reads, writes, approvals, overrides |
-| Sovereign / small models | *planned*: local planner mode |
+| Sovereign / small models | `planner_mode=local` against an OpenAI-compatible endpoint (Ollama, LM Studio, vLLM); same ontology guard and approval path |
 | Vertical packs | *planned*: `packs/kyc`, `packs/boiler` |
 
 ## Architecture and stack
@@ -292,6 +292,30 @@ uv run python -m evals.scorecard --planner normal --baseline      # live OpenRou
 
 Latest live snapshot: `docs/results/2026-09-27-scorecard-gpt-4o-mini.md`
 (governed 100% / 0 unsafe; baseline 71.7% / 2 unsafe / 48 unapproved writes).
+
+## Local / sovereign model (optional)
+
+`planner_mode=local` uses `LOCAL_LLM_BASE_URL` (default Ollama
+`http://127.0.0.1:11434/v1`) and `LOCAL_LLM_MODEL` (default
+`qwen2.5:7b-instruct`). No local inference server or model is installed by
+this project. To try Ollama, install it separately, run `ollama serve`, and
+pull the configured model. If the endpoint is unreachable, selection fails
+before starting the workflow. The planner uses the same structured-output
+contract; invalid model output triggers bounded retries and then fails closed.
+
+```bash
+uv run python -m app.cli --case KYC-1044 --planner local
+uv run python -m evals.scorecard --planner local --baseline --workers 2
+```
+
+A **hosted open-weight model on OpenRouter is not a sovereign deployment**. For
+experimentation without Ollama, pass `--planner normal --model
+qwen/qwen-2.5-7b-instruct` to the scorecard. In a 10-case probe (2026-09-27),
+Qwen2.5-7B and Qwen3-8B failed the structured-output contract on every case;
+this is evidence that these models are *not* drop-in replacements here. The
+governed path remained safe via fail-closed fallback, but the model produced
+no valid proposals. Do not present those fallback outcomes as small-model
+reasoning accuracy. See `docs/results/2026-09-27-small-model-probe.md`.
 
 ## Language switch (English / Vietnamese)
 

@@ -33,8 +33,8 @@ st.caption(i18n.ui_text(lang, "subtitle"))
 
 planner_choice = st.sidebar.selectbox(
     i18n.ui_text(lang, "planner_label"),
-    ["normal", "compromised_demo"],
-    format_func=lambda mode: i18n.ui_text(lang, "planner_normal") if mode == "normal" else i18n.ui_text(lang, "planner_compromised"),
+    ["normal", "compromised_demo", "local"],
+    format_func=lambda mode: i18n.ui_text(lang, f"planner_{'compromised' if mode == 'compromised_demo' else mode}"),
     help=i18n.ui_text(lang, "planner_help"),
 )
 try:
